@@ -408,15 +408,16 @@ int main(int argc, char **argv)
 
 }
 
-// Chunking Helper functions
+// Chunking & Merging Helper functions
 // This calculate number of stripes
 int number_of_stripe(char* file_name, int k){
     //printf("Inside no. stripe function:\n");
     FILE *fptr = fopen(file_name,"r");
     fseek(fptr, 0, SEEK_END);
     int filesize = ftell(fptr);
+    printf("%d\n",filesize);
     fclose(fptr);
-    int stripe_amount = ceil(filesize / (Block_Size * k));
+    int stripe_amount = ceil((double)filesize / (Block_Size * k));
     printf("%d\n",stripe_amount);
     return stripe_amount;
 }
@@ -446,18 +447,18 @@ void chunk_file(char* file_name, int n, int k){
         stripes[h]->data_blocks = (unsigned char**)malloc(k*sizeof(Block_Size));
 
         // declare parity block array inside a Stripe
-        stripes[h]->parity_blocks = (unsigned char**)malloc((n-k)*sizeof(Block_Size));
+        stripes[h]->parity_blocks = (unsigned char**)malloc(( n - k)*sizeof( Block_Size ));
 
         // Split file into datablock
         // declare Datablock with for loop and chunk file
         for(int i = 0; i < k; i++){
-            stripes[h]->data_blocks[i] = (unsigned char*)malloc(Block_Size*sizeof(char));
-            pread(fd, stripes[h]->data_blocks[i], Block_Size, i*Block_Size);
+            stripes[h]->data_blocks[i] = (unsigned char*)malloc(Block_Size);
+            pread(fd, stripes[h]->data_blocks[i], Block_Size, (i + h*k)*Block_Size);
             // Declare file chunk name string
             char* file_chunk_name = (char*)malloc(sizeof(char)*255);
             sprintf(file_chunk_name,"%s-%d-%d",file_name,h,i);
             
-            printf("%s\n",file_chunk_name);
+            //printf("%s\n",file_chunk_name);
 
             FILE* wfptr = fopen(file_chunk_name,"w");
             fwrite(stripes[h]->data_blocks[i], 1, Block_Size, wfptr );
@@ -466,8 +467,58 @@ void chunk_file(char* file_name, int n, int k){
     }
 }
 
-char** find_file(char* file_name){
-    //printf("Inside File Search function:\n");
+
+
+void merge_file(char* file_name,char **file_list, int length){
+    printf("Inside merge file function\n");
+    FILE* original_file = fopen(file_name,"w");
+    if (original_file==NULL)
+    {
+        printf("file open error: %s (Errno:%d)\n", (char *)strerror(errno), errno);
+        return;
+    }
+
+    int c;
+    //printf("%s\n",file_list[0]);
+    printf("Inside merge file\n");
+    for(int i = 0; i < length;i++){
+            // Merge content in file_list
+            //printf("Inside for loop\n");
+            
+            FILE* fp1 = fopen(file_list[i],"r");
+            if( fp1 == NULL) {
+                perror("Error ");
+                printf("Press any key to exit...\n");
+                return ;
+            }
+            while ((c = fgetc(fp1)) != EOF){
+                fputc(c, original_file);            
+            }   
+            fclose(fp1); 
+        } 
+      fclose(original_file);          
+    }
+
+
+
+// Defining comparator function as per the requirement 
+static int comparator(const void* a, const void* b) 
+{ 
+    // setting up rules for comparison 
+    return strcmp(*(const char**)a, *(const char**)b); 
+} 
+  
+// Function to sort the array 
+void sort_strings(char** arr, int n) 
+{ 
+    // calling qsort function to sort the array 
+    // with the help of Comparator 
+    qsort(arr, n, sizeof(const char*), comparator); 
+} 
+
+// Return File List
+int find_file(char* file_name, char** file_list){
+    printf("Inside File Search function:\n");
     struct dirent *de;  // Pointer for directory entry 
   
     // opendir() returns a pointer of DIR type.  
@@ -476,20 +527,19 @@ char** find_file(char* file_name){
     if (dr == NULL)  // opendir returns NULL if couldn't open directory 
     { 
         printf("Could not open current directory" ); 
-        return NULL;
+        return -1;
     } 
-  
-    char** file_list = malloc(sizeof(char)*255*100);
-    int i = 0;
+    int list_length = 0;
+    char* string_pattern = malloc(255);
+    sprintf(string_pattern,"%s-",file_name);
     while ((de = readdir(dr)) != NULL) {
-        if(strstr(de->d_name, file_name)){
-            file_list[i] = de->d_name;
+        if(strstr(de->d_name, string_pattern)){
+            file_list[list_length] = de->d_name;
             //printf("%s\n", de->d_name); 
-            i++;
+            list_length++;
         }
     }
     closedir(dr);
-    //printf("Print file_list\n");
-    //printf("%s\n",file_list[2]);
-    return file_list;
+    sort_strings(file_list,list_length);
+    return list_length++;
 }
