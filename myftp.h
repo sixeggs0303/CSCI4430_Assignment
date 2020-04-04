@@ -7,6 +7,10 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <dirent.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <dirent.h> 
+#include <math.h>
 
 #define Buffer_Size 256
 #define no_of_threads 10
