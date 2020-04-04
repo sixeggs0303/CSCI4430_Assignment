@@ -54,24 +54,49 @@ void message_to_client(int clientsd, struct message_s m_header, char *payload, i
 void server_list(int clientsd, struct packet recv_packet)
 {
 	struct message_s list_reply = {.protocol = {'m', 'y', 'f', 't', 'p'}, .type = 0xA2};
-	char payload[1024];
-	memset(payload, 0, 1);
+	char buffer[1024];
+    memset(buffer, 0, 1);
 
-	DIR *dirp;
-	if ((dirp = opendir("data")) == NULL)
-	{
-		perror("Open directory Error");
-		exit(0);
-	};
-
-	struct dirent *entry;
-	while ((entry = readdir(dirp)))
-	{
-		printf("%s\n", entry->d_name);
-		strcat(payload, entry->d_name);
-		strcat(payload, "\n");
-	}
-	closedir(dirp);
+    DIR *dirp;
+    if ((dirp = opendir("data")) == NULL)
+    {
+        perror("Open directory Error");
+        exit(0);
+    };
+    struct dirent *entry;
+    int numberOfItem = 0;
+    while ((entry = readdir(dirp)))
+    {
+        numberOfItem++;
+    }
+    rewinddir(dirp);
+    char *payload = malloc(1024 * numberOfItem);
+    while ((entry = readdir(dirp)))
+    {
+        strcpy(buffer, entry->d_name);
+        int index = (strchr(buffer, '_')) - buffer;
+        char *tem = malloc(sizeof(char) * index);
+        strncat(tem, buffer, index);
+        if (index != 0)
+        {
+            if (strstr(payload, tem) == 0)
+            {
+                strncat(payload, buffer, index);
+                strcat(payload, "\n");
+            }
+            else
+            {
+                continue;
+            }
+        }
+        else
+        {
+            strcat(payload, buffer);
+            strcat(payload, "\n");
+        }
+    }
+    printf("%s", payload);
+    closedir(dirp);
 	list_reply.length = 10 + strlen(payload);
 	message_to_client(clientsd, list_reply, payload, strlen(payload));
 }
