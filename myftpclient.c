@@ -9,7 +9,7 @@ void quit_with_usage_msg()
 
 void getData(char *filename, int *n, int *k, int *blockSize, char ipAddress[5][15], int port[5])
 {
-
+	//Get the file
     FILE *fptr = fopen(filename, "rb");
     if (fptr == NULL)
     {
@@ -402,4 +402,90 @@ int main(int argc, char **argv)
 
 	return 0;
 
+}
+
+// Chunking Helper functions
+// This calculate number of stripes
+int number_of_stripe(char* file_name, int k){
+    //printf("Inside no. stripe function:\n");
+    FILE *fptr = fopen(file_name,"r");
+    fseek(fptr, 0, SEEK_END);
+    int filesize = ftell(fptr);
+    fclose(fptr);
+    int stripe_amount = ceil(filesize / (Block_Size * k));
+    printf("%d\n",stripe_amount);
+    return stripe_amount;
+}
+
+// Usage: The file will be splited with file_name input,n and k
+// You can also add Stripe **stripes parameter to preserve the Object Lists
+void chunk_file(char* file_name, int n, int k){
+    //printf("Inside chunk file function:\n");
+    // Read the file
+    int fd = open(file_name, O_RDONLY);
+    
+    if (!fd)
+    {
+        printf("file open error: %s (Errno:%d)\n", (char *)strerror(errno), errno);
+        return;
+    }
+    // Move this line below to main to preserve the Objects
+    Stripe **stripes = (Stripe**)malloc(sizeof(Stripe)*number_of_stripe(file_name, k));
+
+    // Split file into stripe
+    for(int h = 0;h < number_of_stripe(file_name, k);h++){
+
+        // Declare Stripe Object
+        stripes[h] = (Stripe*)malloc(sizeof(Stripe));
+
+        // declare Datablock Array inside a Stripe
+        stripes[h]->data_blocks = (unsigned char**)malloc(k*sizeof(Block_Size));
+
+        // declare parity block array inside a Stripe
+        stripes[h]->parity_blocks = (unsigned char**)malloc((n-k)*sizeof(Block_Size));
+
+        // Split file into datablock
+        // declare Datablock with for loop and chunk file
+        for(int i = 0; i < k; i++){
+            stripes[h]->data_blocks[i] = (unsigned char*)malloc(Block_Size*sizeof(char));
+            pread(fd, stripes[h]->data_blocks[i], Block_Size, i*Block_Size);
+            // Declare file chunk name string
+            char* file_chunk_name = (char*)malloc(sizeof(char)*255);
+            sprintf(file_chunk_name,"%s-%d-%d",file_name,h,i);
+            
+            printf("%s\n",file_chunk_name);
+
+            FILE* wfptr = fopen(file_chunk_name,"w");
+            fwrite(stripes[h]->data_blocks[i], 1, Block_Size, wfptr );
+            fclose(wfptr);
+        }
+    }
+}
+
+char** find_file(char* file_name){
+    //printf("Inside File Search function:\n");
+    struct dirent *de;  // Pointer for directory entry 
+  
+    // opendir() returns a pointer of DIR type.  
+    DIR *dr = opendir("."); 
+  
+    if (dr == NULL)  // opendir returns NULL if couldn't open directory 
+    { 
+        printf("Could not open current directory" ); 
+        return NULL;
+    } 
+  
+    char** file_list = malloc(sizeof(char)*255*100);
+    int i = 0;
+    while ((de = readdir(dr)) != NULL) {
+        if(strstr(de->d_name, file_name)){
+            file_list[i] = de->d_name;
+            //printf("%s\n", de->d_name); 
+            i++;
+        }
+    }
+    closedir(dr);
+    //printf("Print file_list\n");
+    //printf("%s\n",file_list[2]);
+    return file_list;
 }
