@@ -218,11 +218,18 @@ void client_get(int sd, char *filename)
 	}
 }
 
-void client_put(int n, int* sd, char *filename)
+void client_put(int n, int *sd, char *filename)
 {
 	printf("Put (%s) to %d servers\n", filename, n);
+	int serverLeft = n;
 
-	// Check File existance
+	//Flag 1 if the file is transfered to server[i]
+	int* completedServer = (int*)malloc(sizeof(int) * n);
+	for(int i = 0; i < n; i ++){
+		completedServer[i] = 0;
+	}
+
+	// Check file existance
 	if (access(filename, F_OK) != -1)
 		printf("[%s] Exist.\n", filename);
 	else
@@ -231,69 +238,100 @@ void client_put(int n, int* sd, char *filename)
 		return;
 	}
 
-	//Construct Put Request
-	struct message_s put_request;
-	memcpy(put_request.protocol, (unsigned char[]){'m', 'y', 'f', 't', 'p'}, 5);
-	put_request.type = 0xC1;
-	put_request.length = sizeof(struct message_s) + strlen(filename) + 1;
-	for(int i = 0; i < n; i++){
-		message_to_server(sd[i], put_request, filename, strlen(filename) + 1);
-	}
-
-	//Receive Post Reply
-	struct packet post_reply;
-	int len;
-	//Error
-	if ((len = recvn(sd, &post_reply, sizeof(struct message_s))) < 0)
+	//Do all server received the file
+	while (serverLeft > 0)
 	{
-		printf("Send error: %s (Errno:%d)\n", strerror(errno), errno);
-		return;
+		int maxfd = 0;
+		fd_set fds;
+
+		FD_ZERO(&fds);
+		for (int i = 0; i < n; i++)
+		{
+			//if the file is not yet uploaded to that server, put it to fds
+			if(completedServer[i] == 0){
+				FD_SET(sd[i], &fds);
+				maxfd = sd[i] > maxfd ? sd[i] : maxfd;
+			}
+		}
+
+		select(maxfd + 1, NULL, &fds, NULL, NULL);
+
+		for (int i = 0; i < n; i++)
+		{
+			//No need to upload again if we finished that
+			if(completedServer[i] == 1){
+				continue;
+			}
+
+			if (FD_ISSET(sd[i], &fds))
+			{
+				//Construct Put Request
+				struct message_s put_request;
+				memcpy(put_request.protocol, (unsigned char[]){'m', 'y', 'f', 't', 'p'}, 5);
+				put_request.type = 0xC1;
+				put_request.length = sizeof(struct message_s) + strlen(filename) + 1;
+				message_to_server(sd[i], put_request, filename, strlen(filename) + 1);
+
+				//Receive Post Reply
+				struct packet post_reply;
+				int len;
+				//Error
+				if ((len = recvn(sd[i], &post_reply, sizeof(struct message_s))) < 0)
+				{
+					printf("Send error: %s (Errno:%d)\n", strerror(errno), errno);
+					return;
+				}
+
+				if (len == 0)
+				{
+					printf("0 Packet Received\n");
+					return;
+				}
+
+				//Validate Message
+				if (check_myftp(post_reply.header.protocol) < 0)
+				{
+					printf("Invalid Protocol\n");
+					return;
+				}
+
+				if (post_reply.header.type != 0xC2)
+				{
+					printf("Invalid Message Type\n");
+					return;
+				}
+
+				//Open File
+				FILE *fptr = fopen(filename, "rb");
+				if (fptr == NULL)
+				{
+					printf("file open error: %s (Errno:%d)\n", (char *)strerror(errno), errno);
+					return;
+				}
+
+				//Get File Size
+				fseek(fptr, 0, SEEK_END);
+				int filesize = ftell(fptr);
+				rewind(fptr);
+
+				//Send File
+				char *buffer = malloc(sizeof(char) * filesize);
+				printf("File Size To Send %lu\n", fread(buffer, sizeof(char), filesize, fptr));
+				struct message_s file_data;
+				memcpy(file_data.protocol, (unsigned char[]){'m', 'y', 'f', 't', 'p'}, 5);
+				file_data.type = 0xFF;
+				file_data.length = sizeof(struct message_s) + filesize;
+				message_to_server(sd[i], file_data, buffer, filesize);
+
+				free(buffer);
+				fclose(fptr);
+				printf("File Transfer Completed. [Server %d]\n", i);
+
+				serverLeft--;
+				completedServer[i] = 1;
+			}
+		}
 	}
-
-	if (len == 0)
-	{
-		printf("0 Packet Received\n");
-		return;
-	}
-
-	//Validate Message
-	if (check_myftp(post_reply.header.protocol) < 0)
-	{
-		printf("Invalid Protocol\n");
-		return;
-	}
-
-	if (post_reply.header.type != 0xC2)
-	{
-		printf("Invalid Message Type\n");
-		return;
-	}
-
-	//Open File
-	FILE *fptr = fopen(filename, "rb");
-	if (fptr == NULL)
-	{
-		printf("file open error: %s (Errno:%d)\n", (char *)strerror(errno), errno);
-		return;
-	}
-
-	//Get File Size
-	fseek(fptr, 0, SEEK_END);
-	int filesize = ftell(fptr);
-	rewind(fptr);
-
-	//Send File
-	char *buffer = malloc(sizeof(char) * filesize);
-	printf("File Size To Send %lu\n", fread(buffer, sizeof(char), filesize, fptr));
-	struct message_s file_data;
-	memcpy(file_data.protocol, (unsigned char[]){'m', 'y', 'f', 't', 'p'}, 5);
-	file_data.type = 0xFF;
-	file_data.length = sizeof(struct message_s) + filesize;
-	message_to_server(sd, file_data, buffer, filesize);
-
-	free(buffer);
-	fclose(fptr);
-	printf("File Transfer Completed.\n");
 }
 
 int main(int argc, char **argv)
@@ -310,7 +348,6 @@ int main(int argc, char **argv)
 	{
 		quit_with_usage_msg();
 	}
-
 	if ((strcmp(argv[2], "get")) == 0 || (strcmp(argv[2], "put") == 0))
 	{
 		if (argc == 4)
@@ -338,6 +375,7 @@ int main(int argc, char **argv)
 	{
 		quit_with_usage_msg();
 	}
+
 	char ipAddress[5][15];
     memset(ipAddress, 0, sizeof(ipAddress));
     int port[5];
@@ -346,9 +384,6 @@ int main(int argc, char **argv)
     getData(argv[1], &n, &k, &blockSize, ipAddress, port);
 	
 	//Connection Setup
-
-
-
 
 	//Create n socket descriptor for server connection
 	int* sd = (int*)malloc(sizeof(int) * n);
@@ -362,8 +397,6 @@ int main(int argc, char **argv)
 		if (connect(sd[i], (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
 		{
 			printf("Failed to connect %s:::%d\n", ipAddress[i], port[i]);
-			//printf("connection error: %s (Errno:%d)\n", strerror(errno), errno);
-			//exit(0);
 			continue;
 		}
 		connectedServers++;
@@ -393,7 +426,7 @@ int main(int argc, char **argv)
 		break;
 	case 2:
 		if(connectedServers == n){
-			//client_put(n, sd, filename);
+			client_put(n, sd, filename);
 		}else{
 			printf("Unable to PUT file if number of servers connected != %d\n", n);
 		}
