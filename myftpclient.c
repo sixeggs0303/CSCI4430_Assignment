@@ -1,6 +1,10 @@
 #include "myftp.h"
 #include <arpa/inet.h>
 
+#define N 5
+#define K 3
+#define Block_Size 300
+
 void quit_with_usage_msg()
 {
 	printf("Usage: ./myftpclient clientconfig.txt <list|get|put> <file>\n");
