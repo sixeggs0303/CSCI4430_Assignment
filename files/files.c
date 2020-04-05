@@ -1,4 +1,4 @@
-#include"files.h"
+#include "files.h"
 
 // Chunking & Merging Helper functions
 // This calculate number of stripes
@@ -254,6 +254,7 @@ uint8_t* decodeData(int n, int k, Stripe *stripe, size_t blockSize){
 }
 
 // Main for testing purposes or usage example
+/*
 int main(){
 	// Mock data
 	int k = 3;
@@ -280,4 +281,4 @@ int main(){
 	//merge_file(fileName, fileList, blockSize, fileSizeOf(fileName), 1);
 	printf("Hello World\n");
 }
-
+*/

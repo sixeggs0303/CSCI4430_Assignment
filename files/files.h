@@ -1,5 +1,17 @@
-#include "../myftp.h"
 #include <isa-l.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <errno.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <dirent.h> 
+#include <math.h>
 
 // Stripe Structure
 typedef struct stripe{
@@ -47,3 +59,5 @@ int find_file(char *fileName, char **fileList);
 
 
 
+
+int fileSizeOf(char *filename);

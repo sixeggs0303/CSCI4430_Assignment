@@ -11,6 +11,9 @@
 #include <fcntl.h>
 #include <dirent.h> 
 #include <math.h>
+#include "files/files.h"
+#include <isa-l.h>
+
 
 #define Buffer_Size 256
 #define no_of_threads 10

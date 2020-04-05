@@ -63,23 +63,9 @@ void message_to_server(int sd, struct message_s m_header, char *payload, int pay
 	free(send_message);
 }
 
-// Chunking & Merging Helper functions
-// This calculate number of stripes
-int number_of_stripe(char *file_name, int k, int blockSize)
-{
-	//printf("Inside no. stripe function:\n");
-	FILE *fptr = fopen(file_name, "r");
-	fseek(fptr, 0, SEEK_END);
-	int filesize = ftell(fptr);
-	//printf("%d\n", filesize);
-	fclose(fptr);
-	int stripe_amount = ceil((double)filesize / (blockSize * k));
-	//printf("%d\n", stripe_amount);
-	return stripe_amount;
-}
-
 // Usage: The file will be splited with file_name input,n and k
 // You can also add Stripe **stripes parameter to preserve the Object Lists
+/*
 void chunk_file(char *file_name, int n, int k, int blockSize)
 {
 	//printf("Inside chunk file function:\n");
@@ -128,103 +114,7 @@ void chunk_file(char *file_name, int n, int k, int blockSize)
 		}
 	}
 }
-
-void merge_file(char *filename, char **file_list, int blockSize, int fileSize, int deleteBlock)
-{
-	printf("Inside merge file function\n");
-
-	//Write the merged file to "result_filename"
-	char mergedFilename[1024];
-	strcpy(mergedFilename, "result_");
-	strcat(mergedFilename, filename);
-
-	FILE *original_file = fopen(mergedFilename, "w");
-	if (original_file == NULL)
-	{
-		printf("file open error: %s (Errno:%d)\n", (char *)strerror(errno), errno);
-		return;
-	}
-
-	int mergedBytes = 0;
-	int c;
-	int i = 0;
-	//printf("%s\n",file_list[0]);
-	printf("Inside merge file\n");
-	// for (int i = 0; i < numberOfBlocks; i++)
-	while ((fileSize - mergedBytes) > 0)
-	{
-		// Merge content in file_list
-		//printf("Inside for loop\n");
-
-		FILE *fp1 = fopen(file_list[i], "r");
-		if (fp1 == NULL)
-		{
-			perror("Error ");
-			printf("Press any key to exit...\n");
-			return;
-		}
-		while (((c = fgetc(fp1)) != EOF) && ((fileSize - mergedBytes) > 0))
-		{
-			fputc(c, original_file);
-			mergedBytes++;
-		}
-		fclose(fp1);
-
-		if (deleteBlock)
-		{
-			remove(file_list[i]);
-		}
-		i++;
-	}
-
-	fclose(original_file);
-}
-
-// Defining comparator function as per the requirement
-static int comparator(const void *a, const void *b)
-{
-	// setting up rules for comparison
-	return strcmp(*(const char **)a, *(const char **)b);
-}
-
-// Function to sort the array
-void sort_strings(char **arr, int n)
-{
-	// calling qsort function to sort the array
-	// with the help of Comparator
-	qsort(arr, n, sizeof(const char *), comparator);
-}
-
-// Return File List
-int find_file(char *file_name, char **file_list)
-{
-	//printf("Inside File Search function:\n");
-	struct dirent *de; // Pointer for directory entry
-
-	// opendir() returns a pointer of DIR type.
-	DIR *dr = opendir(".");
-
-	if (dr == NULL) // opendir returns NULL if couldn't open directory
-	{
-		printf("Could not open current directory");
-		return -1;
-	}
-	int list_length = 0;
-	char *string_pattern = malloc(255);
-	sprintf(string_pattern, "%s-", file_name);
-	while ((de = readdir(dr)) != NULL)
-	{
-		if (strstr(de->d_name, string_pattern))
-		{
-			file_list[list_length] = de->d_name;
-			//printf("%s\n", de->d_name);
-			list_length++;
-		}
-	}
-	closedir(dr);
-	sort_strings(file_list, list_length);
-	return list_length++;
-}
+*/
 
 void client_list(int sd)
 {
@@ -400,7 +290,8 @@ void client_put(int n, int k, int blockSize, int *sd, char *filename)
 	int fileSize = fileSizeOf(filename);
 
 	//split file into blocks and save in local
-	chunk_file(filename, n, k, blockSize);
+	Stripe **stripes;
+	chunkFile(filename, n, k, blockSize, stripes);
 	int numberOfStripe = number_of_stripe(filename, k, blockSize);
 	char **blockList = malloc(sizeof(char) * 255 * (n - k) * numberOfStripe);
 
