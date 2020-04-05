@@ -53,3 +53,15 @@ int check_myftp(unsigned char ptc[])
 	}
 	return 0;
 }
+
+int fileSizeOf(char *filename)
+{
+	FILE *fptr = fopen(filename, "rb");
+	if (fptr == NULL)
+	{
+		printf("file open error: %s (Errno:%d)\n", (char *)strerror(errno), errno);
+		return 0;
+	}
+	fseek(fptr, 0, SEEK_END);
+	return ftell(fptr);
+}

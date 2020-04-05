@@ -1,10 +1,6 @@
 #include "myftp.h"
 #include <arpa/inet.h>
 
-#define N 5
-#define K 3
-#define Block_Size 300
-
 void quit_with_usage_msg()
 {
 	printf("Usage: ./myftpclient clientconfig.txt <list|get|put> <file>\n");
@@ -14,38 +10,38 @@ void quit_with_usage_msg()
 void getData(char *filename, int *n, int *k, int *blockSize, char ipAddress[5][15], int port[5])
 {
 	//Get the file
-    FILE *fptr = fopen(filename, "rb");
-    if (fptr == NULL)
-    {
-        printf("file open error: %s (Errno:%d)\n", (char *)strerror(errno), errno);
-        return;
-    }
-    fseek(fptr, 0, SEEK_END);
-    int filesize = ftell(fptr);
-    rewind(fptr);
-    char *buffer = malloc(sizeof(char) * filesize);
-    char serverData[8][255];
-    int i = 0;
-    while ((!feof(fptr)) && i < 8)
-    {
-        fscanf(fptr, "%s", buffer);
-        strcpy(serverData[i], buffer);
-        i++;
-    }
-    fclose(fptr);
+	FILE *fptr = fopen(filename, "rb");
+	if (fptr == NULL)
+	{
+		printf("file open error: %s (Errno:%d)\n", (char *)strerror(errno), errno);
+		return;
+	}
+	fseek(fptr, 0, SEEK_END);
+	int filesize = ftell(fptr);
+	rewind(fptr);
+	char *buffer = malloc(sizeof(char) * filesize);
+	char serverData[8][255];
+	int i = 0;
+	while ((!feof(fptr)) && i < 8)
+	{
+		fscanf(fptr, "%s", buffer);
+		strcpy(serverData[i], buffer);
+		i++;
+	}
+	fclose(fptr);
 
-    int index = (strchr(serverData[3], ':')) - serverData[3];
+	int index = (strchr(serverData[3], ':')) - serverData[3];
 
-    *n = atoi(serverData[0]);
-    *k = atoi(serverData[1]);
-    *blockSize = atoi(serverData[2]);
-    for (int i = 0; i < 5; i++)
-    {
-        memcpy(ipAddress[i], serverData[i + 3], index);
-        char tem[6];
-        memcpy(tem, serverData[i + 3] + index + 1, 5);
-        port[i] = atoi(tem);
-    }
+	*n = atoi(serverData[0]);
+	*k = atoi(serverData[1]);
+	*blockSize = atoi(serverData[2]);
+	for (int i = 0; i < 5; i++)
+	{
+		memcpy(ipAddress[i], serverData[i + 3], index);
+		char tem[6];
+		memcpy(tem, serverData[i + 3] + index + 1, 5);
+		port[i] = atoi(tem);
+	}
 }
 
 void message_to_server(int sd, struct message_s m_header, char *payload, int payload_length)
@@ -65,6 +61,169 @@ void message_to_server(int sd, struct message_s m_header, char *payload, int pay
 		exit(0);
 	}
 	free(send_message);
+}
+
+// Chunking & Merging Helper functions
+// This calculate number of stripes
+int number_of_stripe(char *file_name, int k, int blockSize)
+{
+	//printf("Inside no. stripe function:\n");
+	FILE *fptr = fopen(file_name, "r");
+	fseek(fptr, 0, SEEK_END);
+	int filesize = ftell(fptr);
+	//printf("%d\n", filesize);
+	fclose(fptr);
+	int stripe_amount = ceil((double)filesize / (blockSize * k));
+	//printf("%d\n", stripe_amount);
+	return stripe_amount;
+}
+
+// Usage: The file will be splited with file_name input,n and k
+// You can also add Stripe **stripes parameter to preserve the Object Lists
+void chunk_file(char *file_name, int n, int k, int blockSize)
+{
+	//printf("Inside chunk file function:\n");
+	// Read the file
+	int fd = open(file_name, O_RDONLY);
+
+	if (!fd)
+	{
+		printf("file open error: %s (Errno:%d)\n", (char *)strerror(errno), errno);
+		return;
+	}
+	int numberOfStripe = number_of_stripe(file_name, k, blockSize);
+	// Move this line below to main to preserve the Objects
+	Stripe **stripes = (Stripe **)malloc(sizeof(Stripe) * numberOfStripe);
+
+	// Split file into stripe
+	for (int h = 0; h < numberOfStripe; h++)
+	{
+		// Declare Stripe Object
+		stripes[h] = (Stripe *)malloc(sizeof(Stripe));
+
+		// declare Datablock Array inside a Stripe
+		stripes[h]->data_blocks = (unsigned char **)malloc(k * sizeof(blockSize));
+
+		// declare parity block array inside a Stripe
+		stripes[h]->parity_blocks = (unsigned char **)malloc((n - k) * sizeof(blockSize));
+
+		// Split file into datablock
+		// declare Datablock with for loop and chunk file
+		int maxH = ceil(log(numberOfStripe) / log(10));
+		//printf("max h is %d\n", maxH);
+
+		for (int i = 0; i < k; i++)
+		{
+			stripes[h]->data_blocks[i] = (unsigned char *)malloc(blockSize);
+			pread(fd, stripes[h]->data_blocks[i], blockSize, (i + h * k) * blockSize);
+			// Declare file chunk name string
+			char *file_chunk_name = (char *)malloc(sizeof(char) * 255);
+			sprintf(file_chunk_name, "%s-%0*d-%d", file_name, maxH, h, i);
+			//printf("%s\n",file_chunk_name);
+
+			FILE *wfptr = fopen(file_chunk_name, "wb");
+			fwrite(stripes[h]->data_blocks[i], 1, blockSize, wfptr);
+			//printf("Block created: %s\n", file_chunk_name);
+			fclose(wfptr);
+		}
+	}
+}
+
+void merge_file(char *filename, char **file_list, int blockSize, int fileSize, int deleteBlock)
+{
+	printf("Inside merge file function\n");
+
+	//Write the merged file to "result_filename"
+	char mergedFilename[1024];
+	strcpy(mergedFilename, "result_");
+	strcat(mergedFilename, filename);
+
+	FILE *original_file = fopen(mergedFilename, "w");
+	if (original_file == NULL)
+	{
+		printf("file open error: %s (Errno:%d)\n", (char *)strerror(errno), errno);
+		return;
+	}
+
+	int mergedBytes = 0;
+	int c;
+	int i = 0;
+	//printf("%s\n",file_list[0]);
+	printf("Inside merge file\n");
+	// for (int i = 0; i < numberOfBlocks; i++)
+	while ((fileSize - mergedBytes) > 0)
+	{
+		// Merge content in file_list
+		//printf("Inside for loop\n");
+
+		FILE *fp1 = fopen(file_list[i], "r");
+		if (fp1 == NULL)
+		{
+			perror("Error ");
+			printf("Press any key to exit...\n");
+			return;
+		}
+		while (((c = fgetc(fp1)) != EOF) && ((fileSize - mergedBytes) > 0))
+		{
+			fputc(c, original_file);
+			mergedBytes++;
+		}
+		fclose(fp1);
+
+		if (deleteBlock)
+		{
+			remove(file_list[i]);
+		}
+		i++;
+	}
+
+	fclose(original_file);
+}
+
+// Defining comparator function as per the requirement
+static int comparator(const void *a, const void *b)
+{
+	// setting up rules for comparison
+	return strcmp(*(const char **)a, *(const char **)b);
+}
+
+// Function to sort the array
+void sort_strings(char **arr, int n)
+{
+	// calling qsort function to sort the array
+	// with the help of Comparator
+	qsort(arr, n, sizeof(const char *), comparator);
+}
+
+// Return File List
+int find_file(char *file_name, char **file_list)
+{
+	//printf("Inside File Search function:\n");
+	struct dirent *de; // Pointer for directory entry
+
+	// opendir() returns a pointer of DIR type.
+	DIR *dr = opendir(".");
+
+	if (dr == NULL) // opendir returns NULL if couldn't open directory
+	{
+		printf("Could not open current directory");
+		return -1;
+	}
+	int list_length = 0;
+	char *string_pattern = malloc(255);
+	sprintf(string_pattern, "%s-", file_name);
+	while ((de = readdir(dr)) != NULL)
+	{
+		if (strstr(de->d_name, string_pattern))
+		{
+			file_list[list_length] = de->d_name;
+			//printf("%s\n", de->d_name);
+			list_length++;
+		}
+	}
+	closedir(dr);
+	sort_strings(file_list, list_length);
+	return list_length++;
 }
 
 void client_list(int sd)
@@ -218,14 +377,14 @@ void client_get(int sd, char *filename)
 	}
 }
 
-void client_put(int n, int *sd, char *filename)
+void client_put(int n, int k, int blockSize, int *sd, char *filename)
 {
 	printf("Put (%s) to %d servers\n", filename, n);
-	int serverLeft = n;
 
 	//Flag 1 if the file is transfered to server[i]
-	int* completedServer = (int*)malloc(sizeof(int) * n);
-	for(int i = 0; i < n; i ++){
+	int *completedServer = (int *)malloc(sizeof(int) * n);
+	for (int i = 0; i < n; i++)
+	{
 		completedServer[i] = 0;
 	}
 
@@ -238,8 +397,58 @@ void client_put(int n, int *sd, char *filename)
 		return;
 	}
 
+	int fileSize = fileSizeOf(filename);
+
+	//split file into blocks and save in local
+	chunk_file(filename, n, k, blockSize);
+	int numberOfStripe = number_of_stripe(filename, k, blockSize);
+	char **blockList = malloc(sizeof(char) * 255 * (n - k) * numberOfStripe);
+
+	//Group blocks by Server ID
+	char ***blockListByServerID = malloc(sizeof(char ***) * n);
+	for (int i = 0; i < n; i++)
+	{
+		blockListByServerID[i] = malloc(sizeof(char **) * numberOfStripe);
+	}
+
+	//Current progress for each server
+	int *nextBlockToSendPtr = malloc(sizeof(int) * n);
+	for (int i = 0; i < n; i++)
+	{
+		nextBlockToSendPtr[i] = 0;
+	}
+
+	//Total number of blocks to send
+	int blocksToSend = find_file(filename, blockList);
+
+	//!!!!!!!!For Debug Only
+	int *lastBlockToSendPtr = malloc(sizeof(int) * n);
+	for (int i = 0; i < k; i++)
+	{
+		lastBlockToSendPtr[i] = numberOfStripe;
+	}
+	//will remove after implementing parity blocks
+	for (int i = k; i < n; i++)
+	{
+		lastBlockToSendPtr[i] = -1;
+	}
+
+	//!!!!!!!!For Debug Only
+	int counter = 0;
+	for (int i = 0; i < numberOfStripe; i++)
+	{
+		//Will change k to n after implementing parity blocks
+		for (int j = 0; j < k; j++)
+		{
+			blockListByServerID[j][i] = malloc(sizeof(char) * 255);
+			strcpy(blockListByServerID[j][i], blockList[counter++]);
+		}
+	}
+	//For the last parameter, put 1 for deleting all the blocks after merging. Otherwise, 0.
+	//merge_file(filename, blockList, blockSize, fileSize, 1);
+
 	//Do all server received the file
-	while (serverLeft > 0)
+	while (blocksToSend > 0)
 	{
 		int maxfd = 0;
 		fd_set fds;
@@ -248,7 +457,8 @@ void client_put(int n, int *sd, char *filename)
 		for (int i = 0; i < n; i++)
 		{
 			//if the file is not yet uploaded to that server, put it to fds
-			if(completedServer[i] == 0){
+			if (completedServer[i] == 0)
+			{
 				FD_SET(sd[i], &fds);
 				maxfd = sd[i] > maxfd ? sd[i] : maxfd;
 			}
@@ -256,27 +466,31 @@ void client_put(int n, int *sd, char *filename)
 
 		select(maxfd + 1, NULL, &fds, NULL, NULL);
 
-		for (int i = 0; i < n; i++)
+		for (int serverID = 0; serverID < n; serverID++)
 		{
-			//No need to upload again if we finished that
-			if(completedServer[i] == 1){
+			//Check if all blocks for this server is sent, mark it as
+			if (nextBlockToSendPtr[serverID] > lastBlockToSendPtr[serverID])
+			{
+				completedServer[serverID] = 1;
 				continue;
 			}
-
-			if (FD_ISSET(sd[i], &fds))
+			if (FD_ISSET(sd[serverID], &fds))
 			{
+				char blockName[1024];
+				strcpy(blockName, blockListByServerID[serverID][nextBlockToSendPtr[serverID]]);
+
 				//Construct Put Request
 				struct message_s put_request;
 				memcpy(put_request.protocol, (unsigned char[]){'m', 'y', 'f', 't', 'p'}, 5);
 				put_request.type = 0xC1;
-				put_request.length = sizeof(struct message_s) + strlen(filename) + 1;
-				message_to_server(sd[i], put_request, filename, strlen(filename) + 1);
+				put_request.length = sizeof(struct message_s) + strlen(blockName) + 1;
+				message_to_server(sd[serverID], put_request, blockName, strlen(blockName) + 1);
 
 				//Receive Post Reply
 				struct packet post_reply;
 				int len;
 				//Error
-				if ((len = recvn(sd[i], &post_reply, sizeof(struct message_s))) < 0)
+				if ((len = recvn(sd[serverID], &post_reply, sizeof(struct message_s))) < 0)
 				{
 					printf("Send error: %s (Errno:%d)\n", strerror(errno), errno);
 					return;
@@ -302,10 +516,13 @@ void client_put(int n, int *sd, char *filename)
 				}
 
 				//Open File
-				FILE *fptr = fopen(filename, "rb");
+				FILE *fptr = fopen(blockName, "rb");
 				if (fptr == NULL)
 				{
 					printf("file open error: %s (Errno:%d)\n", (char *)strerror(errno), errno);
+					printf("[Debug]target file: %s\n", blockName);
+					printf("[Debug]target server: %d\n", serverID);
+					printf("[Debug]nextBlockToSendPtr: %d\n", nextBlockToSendPtr[serverID]);
 					return;
 				}
 
@@ -321,14 +538,14 @@ void client_put(int n, int *sd, char *filename)
 				memcpy(file_data.protocol, (unsigned char[]){'m', 'y', 'f', 't', 'p'}, 5);
 				file_data.type = 0xFF;
 				file_data.length = sizeof(struct message_s) + filesize;
-				message_to_server(sd[i], file_data, buffer, filesize);
+				message_to_server(sd[serverID], file_data, buffer, filesize);
 
 				free(buffer);
 				fclose(fptr);
-				printf("File Transfer Completed. [Server %d]\n", i);
+				printf("File Transfer Completed. [Server %d] [File %s]\n", serverID, blockName);
 
-				serverLeft--;
-				completedServer[i] = 1;
+				nextBlockToSendPtr[serverID]++;
+				blocksToSend--;
 			}
 		}
 	}
@@ -344,7 +561,7 @@ int main(int argc, char **argv)
 	char filename[255];
 
 	//Input Checking
-	if ((argc < 3) || (strcmp(argv[1], "clientconfig.txt")) != 0 )
+	if ((argc < 3) || (strcmp(argv[1], "clientconfig.txt")) != 0)
 	{
 		quit_with_usage_msg();
 	}
@@ -377,17 +594,18 @@ int main(int argc, char **argv)
 	}
 
 	char ipAddress[5][15];
-    memset(ipAddress, 0, sizeof(ipAddress));
-    int port[5];
-    memset(port, 0, sizeof(port));
-    int n,k,blockSize,connectedServers = 0,defaultServer;
-    getData(argv[1], &n, &k, &blockSize, ipAddress, port);
-	
+	memset(ipAddress, 0, sizeof(ipAddress));
+	int port[5];
+	memset(port, 0, sizeof(port));
+	int n, k, blockSize, connectedServers = 0, defaultServer;
+	getData(argv[1], &n, &k, &blockSize, ipAddress, port);
+
 	//Connection Setup
 
 	//Create n socket descriptor for server connection
-	int* sd = (int*)malloc(sizeof(int) * n);
-	for(int i = 0; i < n; i++){
+	int *sd = (int *)malloc(sizeof(int) * n);
+	for (int i = 0; i < n; i++)
+	{
 		sd[i] = socket(AF_INET, SOCK_STREAM, 0);
 		struct sockaddr_in server_addr;
 		memset(&server_addr, 0, sizeof(server_addr));
@@ -404,7 +622,8 @@ int main(int argc, char **argv)
 	}
 	printf("%d servers connected.\n", connectedServers);
 
-	if(connectedServers == 0){
+	if (connectedServers == 0)
+	{
 		printf("All servers are not available. Please try again.\n");
 		return 1;
 	}
@@ -413,166 +632,36 @@ int main(int argc, char **argv)
 	switch (mode)
 	{
 	case 0:
-		printf("List files from %dth server.\n", defaultServer+1);
+		printf("List files from %dth server.\n", defaultServer + 1);
 		client_list(sd[defaultServer]);
 		break;
 	case 1:
-		if(connectedServers >= k){
+		if (connectedServers >= k)
+		{
 			//To work on later
 			//client_get(sd, filename);
-		}else{
+		}
+		else
+		{
 			printf("Unable to GET file if number of servers connected < %d\n", k);
 		}
 		break;
 	case 2:
-		if(connectedServers == n){
-			client_put(n, sd, filename);
-		}else{
+		if (connectedServers == n)
+		{
+			client_put(n, k, blockSize, sd, filename);
+		}
+		else
+		{
 			printf("Unable to PUT file if number of servers connected != %d\n", n);
 		}
 		break;
 	}
-	
-	for(int i = 0; i < n; i++){
+
+	for (int i = 0; i < n; i++)
+	{
 		close(sd[i]);
 	}
 
 	return 0;
-
-}
-
-// Chunking & Merging Helper functions
-// This calculate number of stripes
-int number_of_stripe(char* file_name, int k){
-    //printf("Inside no. stripe function:\n");
-    FILE *fptr = fopen(file_name,"r");
-    fseek(fptr, 0, SEEK_END);
-    int filesize = ftell(fptr);
-    printf("%d\n",filesize);
-    fclose(fptr);
-    int stripe_amount = ceil((double)filesize / (Block_Size * k));
-    printf("%d\n",stripe_amount);
-    return stripe_amount;
-}
-
-// Usage: The file will be splited with file_name input,n and k
-// You can also add Stripe **stripes parameter to preserve the Object Lists
-void chunk_file(char* file_name, int n, int k){
-    //printf("Inside chunk file function:\n");
-    // Read the file
-    int fd = open(file_name, O_RDONLY);
-    
-    if (!fd)
-    {
-        printf("file open error: %s (Errno:%d)\n", (char *)strerror(errno), errno);
-        return;
-    }
-    // Move this line below to main to preserve the Objects
-    Stripe **stripes = (Stripe**)malloc(sizeof(Stripe)*number_of_stripe(file_name, k));
-
-    // Split file into stripe
-    for(int h = 0;h < number_of_stripe(file_name, k);h++){
-
-        // Declare Stripe Object
-        stripes[h] = (Stripe*)malloc(sizeof(Stripe));
-
-        // declare Datablock Array inside a Stripe
-        stripes[h]->data_blocks = (unsigned char**)malloc(k*sizeof(Block_Size));
-
-        // declare parity block array inside a Stripe
-        stripes[h]->parity_blocks = (unsigned char**)malloc(( n - k)*sizeof( Block_Size ));
-
-        // Split file into datablock
-        // declare Datablock with for loop and chunk file
-        for(int i = 0; i < k; i++){
-            stripes[h]->data_blocks[i] = (unsigned char*)malloc(Block_Size);
-            pread(fd, stripes[h]->data_blocks[i], Block_Size, (i + h*k)*Block_Size);
-            // Declare file chunk name string
-            char* file_chunk_name = (char*)malloc(sizeof(char)*255);
-            sprintf(file_chunk_name,"%s-%d-%d",file_name,h,i);
-            
-            //printf("%s\n",file_chunk_name);
-
-            FILE* wfptr = fopen(file_chunk_name,"w");
-            fwrite(stripes[h]->data_blocks[i], 1, Block_Size, wfptr );
-            fclose(wfptr);
-        }
-    }
-}
-
-
-
-void merge_file(char* file_name,char **file_list, int length){
-    printf("Inside merge file function\n");
-    FILE* original_file = fopen(file_name,"w");
-    if (original_file==NULL)
-    {
-        printf("file open error: %s (Errno:%d)\n", (char *)strerror(errno), errno);
-        return;
-    }
-
-    int c;
-    //printf("%s\n",file_list[0]);
-    printf("Inside merge file\n");
-    for(int i = 0; i < length;i++){
-            // Merge content in file_list
-            //printf("Inside for loop\n");
-            
-            FILE* fp1 = fopen(file_list[i],"r");
-            if( fp1 == NULL) {
-                perror("Error ");
-                printf("Press any key to exit...\n");
-                return ;
-            }
-            while ((c = fgetc(fp1)) != EOF){
-                fputc(c, original_file);            
-            }   
-            fclose(fp1); 
-        } 
-      fclose(original_file);          
-    }
-
-
-
-// Defining comparator function as per the requirement 
-static int comparator(const void* a, const void* b) 
-{ 
-    // setting up rules for comparison 
-    return strcmp(*(const char**)a, *(const char**)b); 
-} 
-  
-// Function to sort the array 
-void sort_strings(char** arr, int n) 
-{ 
-    // calling qsort function to sort the array 
-    // with the help of Comparator 
-    qsort(arr, n, sizeof(const char*), comparator); 
-} 
-
-// Return File List
-int find_file(char* file_name, char** file_list){
-    printf("Inside File Search function:\n");
-    struct dirent *de;  // Pointer for directory entry 
-  
-    // opendir() returns a pointer of DIR type.  
-    DIR *dr = opendir("."); 
-  
-    if (dr == NULL)  // opendir returns NULL if couldn't open directory 
-    { 
-        printf("Could not open current directory" ); 
-        return -1;
-    } 
-    int list_length = 0;
-    char* string_pattern = malloc(255);
-    sprintf(string_pattern,"%s-",file_name);
-    while ((de = readdir(dr)) != NULL) {
-        if(strstr(de->d_name, string_pattern)){
-            file_list[list_length] = de->d_name;
-            //printf("%s\n", de->d_name); 
-            list_length++;
-        }
-    }
-    closedir(dr);
-    sort_strings(file_list,list_length);
-    return list_length++;
 }
