@@ -33,7 +33,3 @@ int recvn(int sd, void *buf, int buf_len);
 int check_myftp(unsigned char ptc[]);
 int fileSizeOf(char *filename);
 
-typedef struct stripe{
-    unsigned char** data_blocks;
-    unsigned char** parity_blocks;
-} Stripe;
