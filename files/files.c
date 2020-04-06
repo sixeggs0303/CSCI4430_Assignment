@@ -152,7 +152,7 @@ int find_file(char *fileName, unsigned char **fileList)
 	}
 	int list_length = 0;
 	char *string_pattern = malloc(1024);
-	sprintf(string_pattern, "%s_", fileName);
+	sprintf(string_pattern, "%s-", fileName);
 	while ((de = readdir(dr)) != NULL)
 	{
 		if (strstr(de->d_name, string_pattern))
