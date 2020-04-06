@@ -203,7 +203,7 @@ void client_get(int n, int k, int blockSize, int *sd, char *filename)
 	int numberOfStripe = -1;
 	int maxH;
 	char *blockName = malloc(sizeof(char) * 1024);
-	strcpy(blockName, "META_");
+	strcpy(blockName, "_META_");
 	strcat(blockName, filename);
 
 	//Do all server received the file
