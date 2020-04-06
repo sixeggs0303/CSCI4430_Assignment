@@ -57,7 +57,8 @@ void sort_strings(unsigned char **arr, int n);
 // The function to find the file, returning file_list
 int find_file(char *fileName, unsigned char **fileList);
 
-
+// Function to create metadata
+void generateMetadata(char* metadataName, char* filename, int fileSize);
 
 
 

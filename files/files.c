@@ -152,7 +152,7 @@ int find_file(char *fileName, unsigned char **fileList)
 	}
 	int list_length = 0;
 	char *string_pattern = malloc(1024);
-	sprintf(string_pattern, "%s_", fileName);
+	sprintf(string_pattern, "%s-", fileName);
 	while ((de = readdir(dr)) != NULL)
 	{
 		if (strstr(de->d_name, string_pattern))
@@ -204,7 +204,7 @@ void blockToFile(char *fileName, int k, int blockSize, unsigned char *block, int
 
 	// Declare file chunk name string
 	char *fileChunkName = (char *)malloc(sizeof(char) * 255);
-	sprintf(fileChunkName, "%s_%0*d_%d", fileName, maxH, stripeIndex, blockIndex);
+	sprintf(fileChunkName, "%s-%0*d_%d", fileName, maxH, stripeIndex, blockIndex);
 	//printf("%s\n",fileChunkName);
 
 	FILE *wfptr = fopen(fileChunkName, "wb");
@@ -257,6 +257,17 @@ uint8_t *decodeData(int n, int k, Stripe *stripe, size_t blockSize)
 
 	ec_encode_data(blockSize, k, n - k, stripe->table, blocksData, &blocksData[k]);
 	return stripe->encodeMatrix;
+}
+
+void generateMetadata(char* metadataName, char* filename, int fileSize)
+{
+	char temp[1024] = "META_";
+	strcat(temp, filename);
+	strcpy(metadataName, temp);
+	printf("Generate metadata: %s\n",metadataName);
+	FILE *mfptr = fopen(metadataName,"w");
+	fprintf(mfptr,"%d",fileSize);
+	fclose(mfptr);
 }
 
 // Main for testing purposes or usage example

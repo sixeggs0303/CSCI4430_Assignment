@@ -157,7 +157,7 @@ void server_get(int clientsd, struct packet recv_packet)
 
 void server_put(int clientsd, struct packet recv_packet)
 {
-	char path[256] = "./data/";
+	char path[1024] = "./data/";
 	strcat(path, recv_packet.payload);
 	//Construct Put Reply Message
 	struct message_s put_reply;
