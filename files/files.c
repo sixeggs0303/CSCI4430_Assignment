@@ -166,6 +166,7 @@ int find_file(char *fileName, unsigned char **fileList)
 			list_length++;
 		}
 	}
+
 	closedir(dr);
 	sort_strings(fileList, list_length);
 	return list_length++;
@@ -277,4 +278,4 @@ int main(){
 	//merge_file(fileName, fileList, blockSize, fileSizeOf(fileName), 1);
 	printf("Hello World\n");
 }
-8?
+*/
