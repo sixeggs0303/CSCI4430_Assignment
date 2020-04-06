@@ -270,6 +270,15 @@ void generateMetadata(char* metadataName, char* filename, int fileSize)
 	fclose(mfptr);
 }
 
+int getFileSizeFromMetadata(char* metadataName)
+{	
+	int fileSize;
+	FILE *mfptr = fopen(metadataName,"r");
+	fscanf(mfptr,"%d",&fileSize);
+	fclose(mfptr);
+	return fileSize;
+}
+
 // Main for testing purposes or usage example
 /*
 int main(){

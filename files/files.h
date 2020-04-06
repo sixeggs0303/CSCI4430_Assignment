@@ -61,5 +61,6 @@ int find_file(char *fileName, unsigned char **fileList);
 
 void generateMetadata(char* metadataName, char* filename, int fileSize);
 
+int getFileSizeFromMetadata(char* metadataName);
 
 int fileSizeOf(char *filename);

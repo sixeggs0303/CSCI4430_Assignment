@@ -178,93 +178,176 @@ void client_list(int sd)
 	return;
 }
 
-void client_get(int sd, char *filename)
+void client_get(int n, int k, int blockSize, int *sd, char *filename)
 {
+	int connectedServers = 0;
+	//Negative if server[i] is not connected
+	int *nextBlockToRecvPtr = malloc(sizeof(int) * n);
+	for (int i = 0; i < n; i++)
+	{
+		if (sd[i] != -1)
+		{
+			connectedServers++;
+			nextBlockToRecvPtr[i] = 0;
+		}
+		else
+		{
+			nextBlockToRecvPtr[i] = -1;
+		}
+	}
+
 	printf("Get (%s)\n", filename);
 
-	//Construct GET Request Message
-	struct message_s get_request;
-	memcpy(get_request.protocol, (unsigned char[]){'m', 'y', 'f', 't', 'p'}, 5);
-	get_request.type = 0xB1;
-	get_request.length = sizeof(struct message_s) + strlen(filename) + 1;
+	int blocksToReceive = -1;
+	int fullFileSize;
+	int numberOfStripe = -1;
+	int maxH;
+	char *blockName = malloc(sizeof(char) * 1024);
+	strcpy(blockName, "META_");
+	strcat(blockName, filename);
 
-	message_to_server(sd, get_request, filename, strlen(filename) + 1);
-
-	//Receive GET Reply
-	struct packet get_reply;
-	int len;
-	//Error
-	if ((len = recvn(sd, &get_reply, sizeof(struct message_s))) < 0)
+	//Do all server received the file
+	while (blocksToReceive != 0)
 	{
-		printf("Send error: %s (Errno:%d)\n", strerror(errno), errno);
-		return;
-	}
+		int maxfd = 0;
+		fd_set fds;
 
-	if (len == 0)
-	{
-		printf("0 Packet Received\n");
-		return;
-	}
-
-	//Check MYFTP
-	if (check_myftp(get_reply.header.protocol) < 0)
-	{
-		printf("Invalid Protocol\n");
-		return;
-	}
-
-	//Process Reply
-	if ((unsigned char)get_reply.header.type == 0xB2)
-	{
-		//Receive File and write to disk
-		struct packet file_data;
-		int file_data_len;
-		if ((file_data_len = recvn(sd, &file_data, sizeof(struct message_s))) < 0)
+		FD_ZERO(&fds);
+		for (int i = 0; i < n; i++)
 		{
-			printf("Send Error: %s (Errno:%d)\n", strerror(errno), errno);
-			return;
-		}
-		if (file_data_len == 0)
-		{
-			printf("0 Packet Received\n");
-			return;
-		}
-		FILE *fptr = fopen(filename, "w");
-		int transfered_data_len = 0;
-
-		file_data.header.length = ntohl(file_data.header.length);
-
-		if (file_data.header.length > 10)
-		{
-			printf("File size received : %d\n", file_data.header.length - 10);
-			char payload[Buffer_Size + 1];
-			while (1)
+			//if all the blocks are not yet received, put it to fds
+			if (nextBlockToRecvPtr[i] >= 0)
 			{
-				memset(&payload, 0, Buffer_Size + 1);
-				if ((file_data_len = recv(sd, &payload, Buffer_Size, 0)) < 0)
-				{
-					printf("Send error: %s (Errno:%d)\n", strerror(errno), errno);
-					break;
-				}
-				fwrite(payload, 1, file_data_len, fptr);
-				transfered_data_len += file_data_len;
-				if (file_data.header.length - 10 <= transfered_data_len)
-					break;
+				FD_SET(sd[i], &fds);
+				maxfd = sd[i] > maxfd ? sd[i] : maxfd;
 			}
 		}
-		fclose(fptr);
-		printf("[%s] Download Completed.\n", filename);
+
+		//IO Multiplexing
+		select(maxfd + 1, NULL, &fds, NULL, NULL);
+		for (int serverID = 0; serverID < n; serverID++)
+		{
+			//Check if all blocks for this server is received
+			if ((numberOfStripe !=-1) && (nextBlockToRecvPtr[serverID] >= numberOfStripe) )
+			{
+				nextBlockToRecvPtr[serverID] = -1;
+				continue;
+			}
+
+			if(blocksToReceive > 0){
+				sprintf(blockName, "%s-%0*d_%d", filename, maxH, nextBlockToRecvPtr[serverID], serverID);
+				printf("File name: %s, maxH: %d, stripe num: %d, serverID: %d",filename,maxH, nextBlockToRecvPtr[serverID], serverID);
+				printf("Get block [%s]\n",blockName);
+			}
+
+			//Get file from server
+			if (FD_ISSET(sd[serverID], &fds))
+			{
+				//Construct GET Request Message
+				struct message_s get_request;
+				memcpy(get_request.protocol, (unsigned char[]){'m', 'y', 'f', 't', 'p'}, 5);
+				get_request.type = 0xB1;
+				get_request.length = sizeof(struct message_s) + strlen(blockName) + 1;
+
+				message_to_server(sd[serverID], get_request, blockName, strlen(blockName) + 1);
+
+				//Receive GET Reply
+				struct packet get_reply;
+				int len;
+				//Error
+				if ((len = recvn(sd[serverID], &get_reply, sizeof(struct message_s))) < 0)
+				{
+					printf("Send error: %s (Errno:%d)\n", strerror(errno), errno);
+					return;
+				}
+
+				if (len == 0)
+				{
+					printf("0 Packet Received\n");
+					return;
+				}
+
+				//Check MYFTP
+				if (check_myftp(get_reply.header.protocol) < 0)
+				{
+					printf("Invalid Protocol\n");
+					return;
+				}
+
+				//Process Reply
+				if ((unsigned char)get_reply.header.type == 0xB2)
+				{
+					//Receive File and write to disk
+					struct packet file_data;
+					int file_data_len;
+					if ((file_data_len = recvn(sd[serverID], &file_data, sizeof(struct message_s))) < 0)
+					{
+						printf("Send Error: %s (Errno:%d)\n", strerror(errno), errno);
+						return;
+					}
+					if (file_data_len == 0)
+					{
+						printf("0 Packet Received\n");
+						return;
+					}
+					FILE *fptr = fopen(blockName, "w");
+					int transfered_data_len = 0;
+
+					file_data.header.length = ntohl(file_data.header.length);
+
+					if (file_data.header.length > 10)
+					{
+						printf("File size received : %d\n", file_data.header.length - 10);
+						char payload[Buffer_Size + 1];
+						while (1)
+						{
+							memset(&payload, 0, Buffer_Size + 1);
+							if ((file_data_len = recv(sd[serverID], &payload, Buffer_Size, 0)) < 0)
+							{
+								printf("Send error: %s (Errno:%d)\n", strerror(errno), errno);
+								break;
+							}
+							fwrite(payload, 1, file_data_len, fptr);
+							transfered_data_len += file_data_len;
+							if (file_data.header.length - 10 <= transfered_data_len)
+								break;
+						}
+					}
+					fclose(fptr);
+					printf("[%s] Download Completed from Server %d.\n", blockName, serverID);
+					blocksToReceive--;
+					nextBlockToRecvPtr[serverID]++;
+				}
+				else if ((unsigned char)get_reply.header.type == 0xB3)
+				{
+					printf("File does not exist.\n");
+					return;
+				}
+				else
+				{
+					printf("Invalid message type.\n");
+					return;
+				}
+			}
+
+			//Process metadata
+			if (blocksToReceive < 0)
+			{
+				fullFileSize = getFileSizeFromMetadata(blockName);
+				numberOfStripe = ceil((double)fullFileSize / (blockSize * k));
+				printf("Metadata received:\nFile size: %d\nNumber of stripe: %d\n", fullFileSize, numberOfStripe);
+				nextBlockToRecvPtr[serverID] = 0;
+				blocksToReceive = numberOfStripe*connectedServers;
+				serverID = -1;
+				maxH = ceil(log(numberOfStripe) / log(10));
+			}
+		}
 	}
-	else if ((unsigned char)get_reply.header.type == 0xB3)
-	{
-		printf("File does not exist.\n");
-		return;
-	}
-	else
-	{
-		printf("Invalid message type.\n");
-		return;
-	}
+
+	//Finish decode and merge the file here
+	//Remember to remove cache file afterward (including Metadata)
+	//
+	//
 }
 
 void client_put(int n, int k, int blockSize, int *sd, char *filename)
@@ -307,7 +390,7 @@ void client_put(int n, int k, int blockSize, int *sd, char *filename)
 	int blocksToSend = find_file(filename, blockList) + n;
 
 	//Generate metadata
-	unsigned char* metadataName = (unsigned char*)malloc(sizeof(unsigned char)*1024);
+	unsigned char *metadataName = (unsigned char *)malloc(sizeof(unsigned char) * 1024);
 	generateMetadata(metadataName, filename, fileSize);
 
 	printf("Start sending\n");
@@ -345,9 +428,12 @@ void client_put(int n, int k, int blockSize, int *sd, char *filename)
 			if (FD_ISSET(sd[serverID], &fds))
 			{
 				char blockName[1024];
-				if(nextBlockToSendPtr[serverID] == numberOfStripe){
+				if (nextBlockToSendPtr[serverID] == numberOfStripe)
+				{
 					strcpy(blockName, metadataName);
-				}else{
+				}
+				else
+				{
 					strcpy(blockName, blockList[nextBlockToSendPtr[serverID] * n + serverID]);
 				}
 				//Construct Put Request
@@ -422,7 +508,8 @@ void client_put(int n, int k, int blockSize, int *sd, char *filename)
 	}
 
 	//Clean cache
-	for(int i =0;i<numberOfStripe*n;i++){
+	for (int i = 0; i < numberOfStripe * n; i++)
+	{
 		remove(blockList[i]);
 	}
 	remove(metadataName);
@@ -492,12 +579,12 @@ int main(int argc, char **argv)
 		if (connect(sd[i], (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
 		{
 			printf("Failed to connect %s:::%d\n", ipAddress[i], port[i]);
+			sd[i] = -1;
 			continue;
 		}
 		connectedServers++;
 		defaultServer = i;
 	}
-	printf("%d servers connected.\n", connectedServers);
 
 	if (connectedServers == 0)
 	{
@@ -516,7 +603,7 @@ int main(int argc, char **argv)
 		if (connectedServers >= k)
 		{
 			//To work on later
-			//client_get(sd, filename);
+			client_get(n, k, blockSize, sd, filename);
 		}
 		else
 		{
