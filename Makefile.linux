@@ -1,5 +1,5 @@
 CC = gcc
-LIB = myftp.c files/files.c  -lm -lisal -lpthread 
+LIB = myftp.c files/files.c  -lm -lisal -lpthread
 
 all: server client
 

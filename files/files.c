@@ -1,3 +1,4 @@
+
 #include "files.h"
 
 // Chunking & Merging Helper functions
@@ -57,14 +58,12 @@ void chunkFile(char *fileName, int n, int k, int blockSize, Stripe **stripes)
 			char *fileChunkName = (char *)malloc(sizeof(char) * 255);
 			sprintf(fileChunkName, "%s-%0*d-%d", fileName, maxH, h, i);
 			//printf("%s\n",fileChunkName);
-
 			FILE *wfptr = fopen(fileChunkName, "wb");
 			fwrite(stripes[h]->blocks[i], 1, blockSize, wfptr);
 			//printf("Block created: %s\n", fileChunkName);
 			fclose(wfptr);
 			*/
 		}
-		printf("Count %d\n",h);
 		encodeData(n, k, stripes[h], blockSize);
 
 	}
@@ -130,18 +129,21 @@ static int comparator(const void *a, const void *b)
 }
 
 // Function to sort the array
-void sort_strings(char **arr, int n)
+void sort_strings(unsigned char **arr, int n)
 {
 	// calling qsort function to sort the array
 	// with the help of Comparator
+	printf("%s\n",arr[0]);
 	qsort(arr, n, sizeof(const char *), comparator);
+	
 }
 
 // Return File List
-int find_file(char *fileName, char **fileList)
+int find_file(char *fileName, unsigned char **fileList)
 {
-
+	
 	//printf("Inside File Search function:\n");
+	printf("%s\n",fileName);
 	struct dirent *de; // Pointer for directory entry
 
 	// opendir() returns a pointer of DIR type.
@@ -153,14 +155,14 @@ int find_file(char *fileName, char **fileList)
 		return -1;
 	}
 	int list_length = 0;
-	char *string_pattern = malloc(255);
-	sprintf(string_pattern, "%s-", fileName);
+	char *string_pattern = malloc(1024);
+	sprintf(string_pattern, "%s_", fileName);
+	printf("%s\n",fileName);
 	while ((de = readdir(dr)) != NULL)
 	{
 		if (strstr(de->d_name, string_pattern))
 		{
 			fileList[list_length] = de->d_name;
-			//printf("%s\n", de->d_name);
 			list_length++;
 		}
 	}
@@ -186,7 +188,6 @@ void stripeToFile(char* fileName, int k, int blockSize, Stripe *stripe, int stri
 			char *fileChunkName = (char *)malloc(sizeof(char) * 255);
 			sprintf(fileChunkName, "%s-%0*d-%d", fileName, maxH, stripeIndex, i);
 			//printf("%s\n",fileChunkName);
-
 			FILE *wfptr = fopen(fileChunkName, "wb");
 			fwrite(stripe->blocks[i], 1, blockSize, wfptr);
 			//printf("Block created: %s\n", fileChunkName);
@@ -202,7 +203,7 @@ void blockToFile(char* fileName, int k, int blockSize, unsigned char* block, int
 		
 		// Declare file chunk name string
 		char *fileChunkName = (char *)malloc(sizeof(char) * 255);
-		sprintf(fileChunkName, "%s-%0*d-%d", fileName, maxH, stripeIndex, blockIndex);
+		sprintf(fileChunkName, "%s_%0*d_%d", fileName, maxH, stripeIndex, blockIndex);
 		//printf("%s\n",fileChunkName);
 
 		FILE *wfptr = fopen(fileChunkName, "wb");
@@ -254,31 +255,25 @@ uint8_t* decodeData(int n, int k, Stripe *stripe, size_t blockSize){
 }
 
 // Main for testing purposes or usage example
-/*
+
 int main(){
 	// Mock data
 	int k = 3;
 	int n = 5;
-	int blockSize = 409600;
+	int blockSize = 40960;
 	char* fileName = "dawn.jpg";
-
     int numberOfStripe = number_of_stripe(fileName, k, blockSize);
 	printf("Number of chunks: %d\n", numberOfStripe);
     Stripe **stripes;
     chunkFile(fileName, n, k, blockSize, stripes);
-
 	int stripeIndex = 12;
 	int blockIndex = 2;
 	//blockToFile(fileName, k, blockSize, stripes[stripeIndex]->blocks[blockIndex],stripeIndex,blockIndex);
 	//stripeToFile(fileName, k, blockSize, stripes[stripeIndex], stripeIndex);
 	//stripesToFile(fileName, k, blockSize, stripes);
-
-	char** fileList = malloc(sizeof(char)*255*k*numberOfStripe);
+	unsigned char** fileList = malloc(sizeof(unsigned char)*255*k*numberOfStripe);
 	find_file(fileName, fileList);
-
 	printf("%s\n",fileList[0]);
-
 	//merge_file(fileName, fileList, blockSize, fileSizeOf(fileName), 1);
 	printf("Hello World\n");
 }
-*/

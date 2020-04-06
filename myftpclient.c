@@ -65,7 +65,7 @@ void message_to_server(int sd, struct message_s m_header, char *payload, int pay
 
 // Usage: The file will be splited with file_name input,n and k
 // You can also add Stripe **stripes parameter to preserve the Object Lists
-
+/*
 void chunk_file(char *file_name, int n, int k, int blockSize)
 {
 	//printf("Inside chunk file function:\n");
@@ -114,7 +114,7 @@ void chunk_file(char *file_name, int n, int k, int blockSize)
 		}
 	}
 }
-
+*/
 
 void client_list(int sd)
 {
@@ -291,9 +291,10 @@ void client_put(int n, int k, int blockSize, int *sd, char *filename)
 
 	//split file into blocks and save in local
 	Stripe **stripes;
-	chunk_file(filename, n, k, blockSize, stripes);
+	chunkFile(filename, n, k, blockSize, stripes);
+	printf("Hi\n");
 	int numberOfStripe = number_of_stripe(filename, k, blockSize);
-	char **blockList = malloc(sizeof(char) * 255 * (n - k) * numberOfStripe);
+	unsigned char **blockList = malloc(sizeof(char)*255*n*numberOfStripe);
 
 	//Group blocks by Server ID
 	char ***blockListByServerID = malloc(sizeof(char ***) * n);
@@ -308,10 +309,13 @@ void client_put(int n, int k, int blockSize, int *sd, char *filename)
 	{
 		nextBlockToSendPtr[i] = 0;
 	}
-
+	printf("%s\n",filename);
 	//Total number of blocks to send
 	int blocksToSend = find_file(filename, blockList);
-
+	for(int i = 0; i < n*numberOfStripe; i++){
+		printf("%s\n",blockList[i]);
+	}
+	printf("After Block send\n");
 	//!!!!!!!!For Debug Only
 	int *lastBlockToSendPtr = malloc(sizeof(int) * n);
 	for (int i = 0; i < k; i++)
@@ -323,7 +327,7 @@ void client_put(int n, int k, int blockSize, int *sd, char *filename)
 	{
 		lastBlockToSendPtr[i] = -1;
 	}
-
+	printf("LOL\n");
 	//!!!!!!!!For Debug Only
 	int counter = 0;
 	for (int i = 0; i < numberOfStripe; i++)
@@ -333,6 +337,7 @@ void client_put(int n, int k, int blockSize, int *sd, char *filename)
 		{
 			blockListByServerID[j][i] = malloc(sizeof(char) * 255);
 			strcpy(blockListByServerID[j][i], blockList[counter++]);
+			printf("%s\n",blockListByServerID[j][i]);
 		}
 	}
 	//For the last parameter, put 1 for deleting all the blocks after merging. Otherwise, 0.

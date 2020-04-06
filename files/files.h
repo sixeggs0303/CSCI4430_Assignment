@@ -51,10 +51,11 @@ void stripesToFile(char* fileName, int n, int k, int blockSize, Stripe **stripes
 static int comparator(const void *a, const void *b);
 
 // Function to sort the string array
-void sort_strings(char **arr, int n);
+//void sort_strings(char **arr, int n);
+void sort_strings(unsigned char **arr, int n);
 
 // The function to find the file, returning file_list
-int find_file(char *fileName, char **fileList);
+int find_file(char *fileName, unsigned char **fileList);
 
 
 
