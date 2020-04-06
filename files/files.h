@@ -58,8 +58,8 @@ void sort_strings(unsigned char **arr, int n);
 int find_file(char *fileName, unsigned char **fileList);
 
 // Function to create metadata
-void generateMetadata(char* metadataName, char* filename, int fileSize);
 
+void generateMetadata(char* metadataName, char* filename, int fileSize);
 
 
 int fileSizeOf(char *filename);
