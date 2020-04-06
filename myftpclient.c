@@ -292,16 +292,8 @@ void client_put(int n, int k, int blockSize, int *sd, char *filename)
 	//split file into blocks and save in local
 	Stripe **stripes;
 	chunkFile(filename, n, k, blockSize, stripes);
-	printf("Hi\n");
 	int numberOfStripe = number_of_stripe(filename, k, blockSize);
-	unsigned char **blockList = malloc(sizeof(char)*255*n*numberOfStripe);
-
-	//Group blocks by Server ID
-	char ***blockListByServerID = malloc(sizeof(char ***) * n);
-	for (int i = 0; i < n; i++)
-	{
-		blockListByServerID[i] = malloc(sizeof(char **) * numberOfStripe);
-	}
+	unsigned char **blockList = (unsigned char **)malloc(sizeof(unsigned char*) * n * numberOfStripe);
 
 	//Current progress for each server
 	int *nextBlockToSendPtr = malloc(sizeof(int) * n);
@@ -309,37 +301,17 @@ void client_put(int n, int k, int blockSize, int *sd, char *filename)
 	{
 		nextBlockToSendPtr[i] = 0;
 	}
-	printf("%s\n",filename);
+
+	// printf("find file now\n");
 	//Total number of blocks to send
 	int blocksToSend = find_file(filename, blockList);
-	for(int i = 0; i < n*numberOfStripe; i++){
-		printf("%s\n",blockList[i]);
-	}
-	printf("After Block send\n");
-	//!!!!!!!!For Debug Only
-	int *lastBlockToSendPtr = malloc(sizeof(int) * n);
-	for (int i = 0; i < k; i++)
-	{
-		lastBlockToSendPtr[i] = numberOfStripe;
-	}
-	//will remove after implementing parity blocks
-	for (int i = k; i < n; i++)
-	{
-		lastBlockToSendPtr[i] = -1;
-	}
-	printf("LOL\n");
-	//!!!!!!!!For Debug Only
-	int counter = 0;
-	for (int i = 0; i < numberOfStripe; i++)
-	{
-		//Will change k to n after implementing parity blocks
-		for (int j = 0; j < k; j++)
-		{
-			blockListByServerID[j][i] = malloc(sizeof(char) * 255);
-			strcpy(blockListByServerID[j][i], blockList[counter++]);
-			printf("%s\n",blockListByServerID[j][i]);
-		}
-	}
+
+	// for (int i = 0; i < blocksToSend; i++)
+	// {
+	// 	printf("[%d] %s\n", i, blockList[i]);
+	// }
+
+	printf("Start sending\n");
 	//For the last parameter, put 1 for deleting all the blocks after merging. Otherwise, 0.
 	//merge_file(filename, blockList, blockSize, fileSize, 1);
 
@@ -365,7 +337,7 @@ void client_put(int n, int k, int blockSize, int *sd, char *filename)
 		for (int serverID = 0; serverID < n; serverID++)
 		{
 			//Check if all blocks for this server is sent, mark it as
-			if (nextBlockToSendPtr[serverID] > lastBlockToSendPtr[serverID])
+			if (nextBlockToSendPtr[serverID] >= numberOfStripe)
 			{
 				completedServer[serverID] = 1;
 				continue;
@@ -373,7 +345,7 @@ void client_put(int n, int k, int blockSize, int *sd, char *filename)
 			if (FD_ISSET(sd[serverID], &fds))
 			{
 				char blockName[1024];
-				strcpy(blockName, blockListByServerID[serverID][nextBlockToSendPtr[serverID]]);
+				strcpy(blockName, blockList[nextBlockToSendPtr[serverID]*n+ serverID]);
 
 				//Construct Put Request
 				struct message_s put_request;
@@ -438,8 +410,9 @@ void client_put(int n, int k, int blockSize, int *sd, char *filename)
 
 				free(buffer);
 				fclose(fptr);
-				printf("File Transfer Completed. [Server %d] [File %s]\n", serverID, blockName);
+				printf("[File %s] transfered to [Server %d]\n", blockName, serverID);
 
+				remove(blockName);
 				nextBlockToSendPtr[serverID]++;
 				blocksToSend--;
 			}

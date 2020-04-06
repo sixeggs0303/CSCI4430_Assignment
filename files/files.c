@@ -19,7 +19,7 @@ void chunkFile(char *fileName, int n, int k, int blockSize, Stripe **stripes)
 	//printf("Inside chunk file function:\n");
 
 	// Initialize the stripe
-	stripes = (Stripe **)malloc(sizeof(Stripe) * number_of_stripe(fileName,k,blockSize));
+	stripes = (Stripe **)malloc(sizeof(Stripe) * number_of_stripe(fileName, k, blockSize));
 
 	// Read the file
 	int fd = open(fileName, O_RDONLY);
@@ -29,10 +29,9 @@ void chunkFile(char *fileName, int n, int k, int blockSize, Stripe **stripes)
 		printf("file open error: %s (Errno:%d)\n", (char *)strerror(errno), errno);
 		return;
 	}
-	
-	
+
 	int numberOfStripe = number_of_stripe(fileName, k, blockSize);
-	printf("number of chunk: %d\n",numberOfStripe);
+	printf("number of chunk: %d\n", numberOfStripe);
 	// Split file into stripe
 	for (int h = 0; h < numberOfStripe; h++)
 	{
@@ -40,7 +39,7 @@ void chunkFile(char *fileName, int n, int k, int blockSize, Stripe **stripes)
 		stripes[h] = (Stripe *)malloc(sizeof(Stripe));
 
 		// declare block Array inside a Stripe
-		stripes[h]->blocks = (unsigned char **)malloc(n*k * sizeof(blockSize));
+		stripes[h]->blocks = (unsigned char **)malloc(n * k * sizeof(blockSize));
 
 		// Split file into block
 		// declare block with for loop and chunk file
@@ -50,9 +49,10 @@ void chunkFile(char *fileName, int n, int k, int blockSize, Stripe **stripes)
 		for (int i = 0; i < n; i++)
 		{
 			stripes[h]->blocks[i] = (unsigned char *)malloc(blockSize);
-			if(i<k){
+			if (i < k)
+			{
 				pread(fd, stripes[h]->blocks[i], blockSize, (i + h * k) * blockSize);
-			}	
+			}
 			/*
 			// Declare file chunk name string
 			char *fileChunkName = (char *)malloc(sizeof(char) * 255);
@@ -65,10 +65,8 @@ void chunkFile(char *fileName, int n, int k, int blockSize, Stripe **stripes)
 			*/
 		}
 		encodeData(n, k, stripes[h], blockSize);
-
 	}
 	stripesToFile(fileName, n, k, blockSize, stripes);
-
 }
 
 void merge_file(char *filename, char **file_list, int blockSize, int fileSize, int deleteBlock)
@@ -133,17 +131,15 @@ void sort_strings(unsigned char **arr, int n)
 {
 	// calling qsort function to sort the array
 	// with the help of Comparator
-	printf("%s\n",arr[0]);
-	qsort(arr, n, sizeof(const char *), comparator);
-	
+	qsort(arr, n, sizeof(*arr), comparator);
 }
 
 // Return File List
 int find_file(char *fileName, unsigned char **fileList)
 {
-	
+
 	//printf("Inside File Search function:\n");
-	printf("%s\n",fileName);
+	//printf("%s\n",fileName);
 	struct dirent *de; // Pointer for directory entry
 
 	// opendir() returns a pointer of DIR type.
@@ -157,34 +153,37 @@ int find_file(char *fileName, unsigned char **fileList)
 	int list_length = 0;
 	char *string_pattern = malloc(1024);
 	sprintf(string_pattern, "%s_", fileName);
-	printf("%s\n",fileName);
 	while ((de = readdir(dr)) != NULL)
 	{
 		if (strstr(de->d_name, string_pattern))
 		{
-			fileList[list_length] = de->d_name;
+			fileList[list_length] = malloc(sizeof(unsigned char)*255);
+			strcpy(fileList[list_length],de->d_name);
 			list_length++;
 		}
 	}
 
 	closedir(dr);
 	sort_strings(fileList, list_length);
-	return list_length++;
+	return list_length;
 }
 
-void stripesToFile(char* fileName, int n, int k, int blockSize, Stripe **stripes){
-	for(int i = 0; i < number_of_stripe(fileName, k, blockSize); i++){
-		stripeToFile(fileName, n, blockSize, stripes[i],i);
+void stripesToFile(char *fileName, int n, int k, int blockSize, Stripe **stripes)
+{
+	for (int i = 0; i < number_of_stripe(fileName, k, blockSize); i++)
+	{
+		stripeToFile(fileName, n, blockSize, stripes[i], i);
 	}
 }
-void stripeToFile(char* fileName, int k, int blockSize, Stripe *stripe, int stripeIndex){
+void stripeToFile(char *fileName, int k, int blockSize, Stripe *stripe, int stripeIndex)
+{
 
-		int numberOfStripe = number_of_stripe(fileName,k,blockSize);
-		int maxH = ceil(log(numberOfStripe) / log(10));
-		for (int i = 0; i < k; i++)
-		{
-			blockToFile(fileName,k,blockSize,stripe->blocks[i], stripeIndex, i);
-			/*
+	int numberOfStripe = number_of_stripe(fileName, k, blockSize);
+	int maxH = ceil(log(numberOfStripe) / log(10));
+	for (int i = 0; i < k; i++)
+	{
+		blockToFile(fileName, k, blockSize, stripe->blocks[i], stripeIndex, i);
+		/*
 			// Declare file chunk name string
 			char *fileChunkName = (char *)malloc(sizeof(char) * 255);
 			sprintf(fileChunkName, "%s-%0*d-%d", fileName, maxH, stripeIndex, i);
@@ -193,37 +192,40 @@ void stripeToFile(char* fileName, int k, int blockSize, Stripe *stripe, int stri
 			fwrite(stripe->blocks[i], 1, blockSize, wfptr);
 			//printf("Block created: %s\n", fileChunkName);
 			fclose(wfptr);	
-			*/	
-		}	
+			*/
+	}
 }
 
-void blockToFile(char* fileName, int k, int blockSize, unsigned char* block, int stripeIndex, int blockIndex){
+void blockToFile(char *fileName, int k, int blockSize, unsigned char *block, int stripeIndex, int blockIndex)
+{
 
-		int numberOfStripe = number_of_stripe(fileName,k,blockSize);
-		int maxH = ceil(log(numberOfStripe) / log(10));
-		
-		// Declare file chunk name string
-		char *fileChunkName = (char *)malloc(sizeof(char) * 255);
-		sprintf(fileChunkName, "%s_%0*d_%d", fileName, maxH, stripeIndex, blockIndex);
-		//printf("%s\n",fileChunkName);
+	int numberOfStripe = number_of_stripe(fileName, k, blockSize);
+	int maxH = ceil(log(numberOfStripe) / log(10));
 
-		FILE *wfptr = fopen(fileChunkName, "wb");
-		fwrite(block, 1, blockSize, wfptr);
-		//printf("Block created: %s\n", fileChunkName);
-		fclose(wfptr);		
+	// Declare file chunk name string
+	char *fileChunkName = (char *)malloc(sizeof(char) * 255);
+	sprintf(fileChunkName, "%s_%0*d_%d", fileName, maxH, stripeIndex, blockIndex);
+	//printf("%s\n",fileChunkName);
+
+	FILE *wfptr = fopen(fileChunkName, "wb");
+	fwrite(block, 1, blockSize, wfptr);
+	//printf("Block created: %s\n", fileChunkName);
+	fclose(wfptr);
 }
 
 // encode
-uint8_t* encodeData(int n, int k, Stripe *stripe, size_t blockSize){
-	stripe->encodeMatrix = malloc(sizeof(uint8_t)*(n*k));
-	stripe->table = malloc(sizeof(uint8_t)*(32*k*(n-k)));
+uint8_t *encodeData(int n, int k, Stripe *stripe, size_t blockSize)
+{
+	stripe->encodeMatrix = malloc(sizeof(uint8_t) * (n * k));
+	stripe->table = malloc(sizeof(uint8_t) * (32 * k * (n - k)));
 
 	gf_gen_rs_matrix(stripe->encodeMatrix, n, k);
 
 	ec_init_tables(k, n - k, &stripe->encodeMatrix[k * k], stripe->table);
 
-	unsigned char** blocksData = malloc(sizeof(unsigned char** )*n);
-	for(int i = 0; i < n; i++){
+	unsigned char **blocksData = malloc(sizeof(unsigned char **) * n);
+	for (int i = 0; i < n; i++)
+	{
 		blocksData[i] = stripe->blocks[i];
 	}
 	ec_encode_data(blockSize, k, n - k, stripe->table, blocksData, &blocksData[k]);
@@ -231,7 +233,8 @@ uint8_t* encodeData(int n, int k, Stripe *stripe, size_t blockSize){
 	return stripe->encodeMatrix;
 }
 
-uint8_t* decodeData(int n, int k, Stripe *stripe, size_t blockSize){
+uint8_t *decodeData(int n, int k, Stripe *stripe, size_t blockSize)
+{
 	gf_gen_rs_matrix(stripe->encodeMatrix, n, k);
 	// WorkNodes = the array of blocks index that is fetched from server
 	/*
@@ -243,11 +246,12 @@ uint8_t* decodeData(int n, int k, Stripe *stripe, size_t blockSize){
 		}
 	}
 	*/
-	gf_invert_matrix(stripe->errorsMatrix,stripe->invertMatrix,k);
+	gf_invert_matrix(stripe->errorsMatrix, stripe->invertMatrix, k);
 	ec_init_tables(k, n - k, &stripe->encodeMatrix[k * k], stripe->table);
 
-	unsigned char** blocksData = malloc(sizeof(unsigned char** )*n);
-	for(int i = 0; i < n; i++){
+	unsigned char **blocksData = malloc(sizeof(unsigned char **) * n);
+	for (int i = 0; i < n; i++)
+	{
 		blocksData[i] = stripe->blocks[i];
 	}
 
