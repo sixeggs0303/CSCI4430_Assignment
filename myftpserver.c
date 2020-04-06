@@ -74,10 +74,15 @@ void server_list(int clientsd, struct packet recv_packet)
 	while ((entry = readdir(dirp)))
 	{
 		strcpy(buffer, entry->d_name);
-		int index = (strrchr(buffer, '-')) - buffer;
+		int block_index = (strrchr(buffer, '-')) - buffer;
+		int meta_index = (strchr(buffer, '_META_')) - buffer;
+		if(meta_index == 0) 
+		{ 
+			continue; 
+		}
 		char *tem = malloc(sizeof(char) * 1024);
-		strncat(tem, buffer, index);
-		if (index != 0)
+		strncat(tem, buffer, block_index);
+		if (block_index != 0)
 		{
 			if (strstr(payload, tem) == 0)
 			{

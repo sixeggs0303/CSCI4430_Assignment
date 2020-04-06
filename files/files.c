@@ -261,7 +261,7 @@ uint8_t *decodeData(int n, int k, Stripe *stripe, size_t blockSize)
 
 void generateMetadata(char* metadataName, char* filename, int fileSize)
 {
-	char temp[1024] = "META_";
+	char temp[1024] = "_META_";
 	strcat(temp, filename);
 	strcpy(metadataName, temp);
 	printf("Generate metadata: %s\n",metadataName);
