@@ -71,34 +71,26 @@ void server_list(int clientsd, struct packet recv_packet)
 	}
 	rewinddir(dirp);
 	char *payload = malloc(1024 * numberOfItem);
+	memset(payload,0,1);
 	while ((entry = readdir(dirp)))
 	{
 		strcpy(buffer, entry->d_name);
 		int block_index = (strrchr(buffer, '-')) - buffer;
 		int meta_index = (strstr(buffer, "_META_")) - buffer;
-		//printf("%d",meta_index);
-		if(meta_index == 0) 
-		{ 
-			continue; 
-		}
+		int nameStart = strlen("_META_");
 		char *tem = malloc(sizeof(char) * 1024);
 		strncat(tem, buffer, block_index);
-		if (block_index != 0)
+		if (meta_index == 0)
 		{
 			if (strstr(payload, tem) == 0)
 			{
-				strncat(payload, buffer, block_index);
+				strcat(payload, buffer+nameStart);
 				strcat(payload, "\n");
 			}
 			else
 			{
 				continue;
 			}
-		}
-		else
-		{
-			strcat(payload, buffer);
-			strcat(payload, "\n");
 		}
 	}
 	printf("%s", payload);
