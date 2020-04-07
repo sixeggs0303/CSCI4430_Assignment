@@ -75,7 +75,8 @@ void server_list(int clientsd, struct packet recv_packet)
 	{
 		strcpy(buffer, entry->d_name);
 		int block_index = (strrchr(buffer, '-')) - buffer;
-		int meta_index = (strchr(buffer, '_META_')) - buffer;
+		int meta_index = (strstr(buffer, "_META_")) - buffer;
+		//printf("%d",meta_index);
 		if(meta_index == 0) 
 		{ 
 			continue; 
@@ -86,7 +87,7 @@ void server_list(int clientsd, struct packet recv_packet)
 		{
 			if (strstr(payload, tem) == 0)
 			{
-				strncat(payload, buffer, index);
+				strncat(payload, buffer, block_index);
 				strcat(payload, "\n");
 			}
 			else
