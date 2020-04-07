@@ -371,7 +371,6 @@ void client_get(int n, int k, int blockSize, int *sd, char *filename)
 	// unsigned char** fileList = malloc(255*n*numberOfStripe);
 	// unsigned char** mergeList = malloc(255*k*numberOfStripe);
 	
-<<<<<<< HEAD
 	// find_file(filename,fileList);
 	// printf("Full File size: %d\n",fullFileSize);
 
@@ -381,36 +380,6 @@ void client_get(int n, int k, int blockSize, int *sd, char *filename)
 	// int mergeListIndex = 0;
 	// char* placeholder = malloc;
 	// for(int i = 0; i < n * numberOfStripe; i++){
-=======
-	find_file(filename,fileList);
-	printf("Full File size: %d\n",fullFileSize);
-
-	// Filter Parity
-	int stripeId = 0;
-	int blockId = 0;
-	int mergeListIndex = 0;
-	for(int i = 0; i < n * numberOfStripe; i++){
-		
-		// Filename Parsing/preprocessing
-		char* temp = malloc(sizeof(fileList[i]));
-		strcpy(temp,fileList[i]);
-		char* indexes = strtok(temp,"-");
-		indexes = strtok(NULL,"");
-		sscanf(indexes,"%d_%d",&stripeId,&blockId);
-		printf("blockID :%d\n",blockId);
-
-		if(blockId >= k) {
-			continue;
-		}else{
-			mergeList[mergeListIndex] = fileList[i];
-			mergeListIndex++;
-		}
-	}
-	// Merge File
-	merge_file(filename, mergeList, blockSize, fullFileSize, 1);
-	// Remove Cache
-	for(int i = 0; i<n*numberOfStripe;i++){
->>>>>>> c0be752a447ea536b62b8a032a337b319b2521ee
 		
 	// 	// Filename Parsing/preprocessing
 	// 	char* temp = malloc(sizeof(fileList[i]));
