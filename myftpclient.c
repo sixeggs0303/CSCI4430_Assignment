@@ -346,8 +346,46 @@ void client_get(int n, int k, int blockSize, int *sd, char *filename)
 
 	//Finish decode and merge the file here
 	//Remember to remove cache file afterward (including Metadata)
-	//
-	//
+	unsigned char** fileList = malloc(255*n*numberOfStripe);
+	unsigned char** mergeList = malloc(255*k*numberOfStripe);
+	
+	find_file(filename,fileList);
+	printf("Full File size: %d\n",fullFileSize);
+
+	// Filter Parity
+	int stripeId = 0;
+	int blockId = 0;
+	int mergeListIndex = 0;
+	char* placeholder = malloc;
+	for(int i = 0; i < n * numberOfStripe; i++){
+		
+		// Filename Parsing/preprocessing
+		char* temp = malloc(sizeof(fileList[i]));
+		strcpy(temp,fileList[i]);
+		char* indexes = strtok(temp,"-");
+		indexes = strtok(NULL,"");
+		sscanf(indexes,"%d_%d",&stripeId,&blockId);
+		printf("blockID :%d\n",blockId);
+
+		if(blockId >= k) {
+			continue;
+		}else{
+			mergeList[mergeListIndex] = fileList[i];
+			mergeListIndex++;
+		}
+	}
+	// Merge File
+	merge_file(filename, mergeList, blockSize, fullFileSize, 1);
+	// Remove Cache
+	for(int i = 0; i<n*numberOfStripe;i++){
+		
+		remove(fileList[i]);
+	}
+	char *metadataName = malloc(sizeof(char) * 1024);
+	strcpy(metadataName, "_META_");
+	strcat(metadataName, filename);
+	remove(metadataName);
+	
 }
 
 void client_put(int n, int k, int blockSize, int *sd, char *filename)

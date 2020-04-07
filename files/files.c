@@ -69,7 +69,7 @@ void chunkFile(char *fileName, int n, int k, int blockSize, Stripe **stripes)
 	stripesToFile(fileName, n, k, blockSize, stripes);
 }
 
-void merge_file(char *filename, char **file_list, int blockSize, int fileSize, int deleteBlock)
+void merge_file(char *filename, unsigned char **file_list, int blockSize, int fileSize, int deleteBlock)
 {
 	printf("Inside merge file function\n");
 
@@ -108,11 +108,6 @@ void merge_file(char *filename, char **file_list, int blockSize, int fileSize, i
 			mergedBytes++;
 		}
 		fclose(fp1);
-
-		if (deleteBlock)
-		{
-			remove(file_list[i]);
-		}
 		i++;
 	}
 
@@ -233,11 +228,11 @@ uint8_t *encodeData(int n, int k, Stripe *stripe, size_t blockSize)
 	return stripe->encodeMatrix;
 }
 
-uint8_t *decodeData(int n, int k, Stripe *stripe, size_t blockSize)
+uint8_t *decodeData(int n, int k, Stripe *stripe, size_t blockSize, int workNodes[])
 {
 	gf_gen_rs_matrix(stripe->encodeMatrix, n, k);
 	// WorkNodes = the array of blocks index that is fetched from server
-	/*
+	
 	for(int i = 0; i < k; i++){
 		int r = workNodes[i];
 		for(int j = 0; j < k; j++)
@@ -245,7 +240,7 @@ uint8_t *decodeData(int n, int k, Stripe *stripe, size_t blockSize)
 			stripe->errorsMatrix[k*i+j] = stripe->encodeMatrix[k * r + j];
 		}
 	}
-	*/
+	
 	gf_invert_matrix(stripe->errorsMatrix, stripe->invertMatrix, k);
 	ec_init_tables(k, n - k, &stripe->encodeMatrix[k * k], stripe->table);
 

@@ -40,7 +40,7 @@ void stripeToFile(char* fileName, int k, int blockSize, Stripe *stripe, int stri
 void blockToFile(char* fileName, int k, int blockSize, unsigned char* block, int stripeIndex, int blockIndex);
 
 // Merge file wth file_list
-void merge_file(char *filename, char **file_list, int blockSize, int fileSize, int deleteBlock);
+void merge_file(char *filename, unsigned char **file_list, int blockSize, int fileSize, int deleteBlock);
 
 // Split all blocks
 void stripesToFile(char* fileName, int n, int k, int blockSize, Stripe **stripes);
