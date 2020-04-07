@@ -85,6 +85,24 @@ void merge_file(char *filename, unsigned char **file_list, int blockSize, int fi
 		return;
 	}
 
+	int n = 5;
+	int k = 2;
+	int numberOfStripe = ceil((double)fileSize / (blockSize*k));
+	
+	// One Stripe
+	// The Error is over here from 94 - 102
+	Stripe** stripes = (Stripe**)malloc(numberOfStripe*sizeof(unsigned char*));
+	for(int j = 0; j < numberOfStripe; j++){
+		//stripes[j]->encodeMatrix = malloc(sizeof(uint8_t) * (n * k));
+		//stripes[j]->table = malloc(sizeof(uint8_t) * (32 * k * (n - k)));
+		//stripes[j]->blocks = (unsigned char**)malloc(n * sizeof(unsigned char*) );
+		for(int i = 0; i < n; i++){
+			//stripes[j]->blocks[i] = (unsigned char*) malloc(blockSize * sizeof(unsigned char));
+		}
+	}
+	
+	
+	printf("%d\n",numberOfStripe);
 	int mergedBytes = 0;
 	int c;
 	int i = 0;
@@ -96,17 +114,33 @@ void merge_file(char *filename, unsigned char **file_list, int blockSize, int fi
 		// Merge content in file_list
 		//printf("Inside for loop\n");
 
+		int stripeId = 0,blockId = 0;
+		char* temp = malloc(sizeof(file_list[i]));
+		strcpy(temp,file_list[i]);
+		char* indexes = strtok(temp,"-");
+		indexes = strtok(NULL,"");
+		sscanf(indexes,"%d_%d",&stripeId,&blockId);
+		printf("stripeID: [%d] BlockID : [%d]\n",stripeId,blockId);
+
 		FILE *fp1 = fopen(file_list[i], "r");
 		if (fp1 == NULL)
 		{
 			perror("Error ");
 			return;
 		}
+		//char* buffer = malloc(blockSize);
 		while (((c = fgetc(fp1)) != EOF) && ((fileSize - mergedBytes) > 0))
 		{
 			fputc(c, original_file);
+			//strcat(buffer,&c);
 			mergedBytes++;
 		}
+		//printf("%lu\n",sizeof(buffer));
+		//memset(buffer,0,sizeof(buffer));
+		//size_t result = fread(buffer,blockSize,1,fp1);
+		//printf("Hi\n");
+		//printf("%s\n",buffer);
+		//printf("Put on memory result: %lui\n",result);
 		fclose(fp1);
 		i++;
 	}
