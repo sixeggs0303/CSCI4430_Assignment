@@ -16,8 +16,6 @@ int number_of_stripe(char *fileName, int k, int blockSize)
 // You can also add Stripe **stripes parameter to preserve the Object Lists
 void chunkFile(char *fileName, int n, int k, int blockSize, Stripe **stripes)
 {
-	//printf("Inside chunk file function:\n");
-
 	// Initialize the stripe
 	stripes = (Stripe **)malloc(sizeof(Stripe) * number_of_stripe(fileName, k, blockSize));
 
@@ -69,9 +67,9 @@ void chunkFile(char *fileName, int n, int k, int blockSize, Stripe **stripes)
 	stripesToFile(fileName, n, k, blockSize, stripes);
 }
 
-void merge_file(char *filename, unsigned char **file_list, int blockSize, int fileSize, int deleteBlock)
+void merge_file(char *filename, unsigned char **file_list, int blockSize, int fileSize,int n,int k,int deleteBlock)
 {
-	printf("Inside merge file function\n");
+	//printf("Inside merge file function\n");
 
 	//Write the merged file to "result_filename"
 	char mergedFilename[1024];
@@ -85,67 +83,44 @@ void merge_file(char *filename, unsigned char **file_list, int blockSize, int fi
 		return;
 	}
 
-	int n = 5;
-	int k = 2;
-	int numberOfStripe = ceil((double)fileSize / (blockSize*k));
-	
-	// One Stripe
-	// The Error is over here from 94 - 102
-	Stripe** stripes = (Stripe**)malloc(numberOfStripe*sizeof(unsigned char*));
-	for(int j = 0; j < numberOfStripe; j++){
-		//stripes[j]->encodeMatrix = malloc(sizeof(uint8_t) * (n * k));
-		//stripes[j]->table = malloc(sizeof(uint8_t) * (32 * k * (n - k)));
-		//stripes[j]->blocks = (unsigned char**)malloc(n * sizeof(unsigned char*) );
-		for(int i = 0; i < n; i++){
-			//stripes[j]->blocks[i] = (unsigned char*) malloc(blockSize * sizeof(unsigned char));
-		}
-	}
-	
-	
-	printf("%d\n",numberOfStripe);
 	int mergedBytes = 0;
 	int c;
-	int i = 0;
-	//printf("%s\n",file_list[0]);
-	printf("Inside merge file\n");
-	// for (int i = 0; i < numberOfBlocks; i++)
+	int serverIDPtr = 0;
+	int stripePtr = 0;
+	//printf("Inside merge file\n");
 	while ((fileSize - mergedBytes) > 0)
 	{
 		// Merge content in file_list
-		//printf("Inside for loop\n");
-
-		int stripeId = 0,blockId = 0;
-		char* temp = malloc(sizeof(file_list[i]));
-		strcpy(temp,file_list[i]);
-		char* indexes = strtok(temp,"-");
-		indexes = strtok(NULL,"");
-		sscanf(indexes,"%d_%d",&stripeId,&blockId);
-		printf("stripeID: [%d] BlockID : [%d]\n",stripeId,blockId);
-
-		FILE *fp1 = fopen(file_list[i], "r");
+		FILE *fp1 = fopen(file_list[stripePtr*n + serverIDPtr], "r");
 		if (fp1 == NULL)
 		{
 			perror("Error ");
 			return;
 		}
-		//char* buffer = malloc(blockSize);
+		//printf("Mergeing %s, merged size = %d\n", file_list[stripePtr*n + i], mergedBytes);
+		
 		while (((c = fgetc(fp1)) != EOF) && ((fileSize - mergedBytes) > 0))
 		{
 			fputc(c, original_file);
-			//strcat(buffer,&c);
 			mergedBytes++;
 		}
-		//printf("%lu\n",sizeof(buffer));
-		//memset(buffer,0,sizeof(buffer));
-		//size_t result = fread(buffer,blockSize,1,fp1);
-		//printf("Hi\n");
-		//printf("%s\n",buffer);
-		//printf("Put on memory result: %lui\n",result);
 		fclose(fp1);
-		i++;
+		serverIDPtr++;
+		if(serverIDPtr==k){
+			serverIDPtr = 0;
+			stripePtr++;
+		}
 	}
-
+	printf("File restored->[%s].\n",mergedFilename);
 	fclose(original_file);
+
+	if(deleteBlock){
+		int numberOfBlocks = ceil((double)fileSize / ((double)blockSize*k)) * n;
+		for(int i = 0; i<numberOfBlocks;i++){
+			remove(file_list[i]);
+		}
+		printf("Removed %d cache.\n",numberOfBlocks);
+	}
 }
 
 // Defining comparator function as per the requirement

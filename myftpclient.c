@@ -180,6 +180,8 @@ void client_list(int sd)
 
 void client_get(int n, int k, int blockSize, int *sd, char *filename)
 {
+	int workNodeIndex = 0;
+	int workNode[5];
 	int connectedServers = 0;
 	//Negative if server[i] is not connected
 	int *nextBlockToRecvPtr = malloc(sizeof(int) * n);
@@ -189,6 +191,7 @@ void client_get(int n, int k, int blockSize, int *sd, char *filename)
 		{
 			connectedServers++;
 			nextBlockToRecvPtr[i] = 0;
+			workNode[workNodeIndex++] = i;
 		}
 		else
 		{
@@ -343,48 +346,52 @@ void client_get(int n, int k, int blockSize, int *sd, char *filename)
 			}
 		}
 	}
+	
+	printf("***Blocks downloaded***\n");
+
+	//Decode Here
+	//Prepared workNode for decodeData
+	for(int i =0;i<k;i++){
+		printf("First k Work Nodes: %d\n",workNode[i]);
+	}
+
+	//Merge Here
+	//Don't merge until u got all the blocks on disk
+	unsigned char **blockList = (unsigned char **)malloc(sizeof(unsigned char *) * n * numberOfStripe);
+	int blocksToSend = find_file(filename, blockList);
+	merge_file(filename, blockList, blockSize, fullFileSize ,n ,k ,1);
 
 	//Finish decode and merge the file here
 	//Remember to remove cache file afterward (including Metadata)
-	unsigned char** fileList = malloc(255*n*numberOfStripe);
-	unsigned char** mergeList = malloc(255*k*numberOfStripe);
+	// unsigned char** fileList = malloc(255*n*numberOfStripe);
+	// unsigned char** mergeList = malloc(255*k*numberOfStripe);
 	
-	find_file(filename,fileList);
-	printf("Full File size: %d\n",fullFileSize);
+	// find_file(filename,fileList);
+	// printf("Full File size: %d\n",fullFileSize);
 
-	// Filter Parity
-	int stripeId = 0;
-	int blockId = 0;
-	int mergeListIndex = 0;
-	char* placeholder = malloc;
-	for(int i = 0; i < n * numberOfStripe; i++){
+	// // Filter Parity
+	// int stripeId = 0;
+	// int blockId = 0;
+	// int mergeListIndex = 0;
+	// char* placeholder = malloc;
+	// for(int i = 0; i < n * numberOfStripe; i++){
 		
-		// Filename Parsing/preprocessing
-		char* temp = malloc(sizeof(fileList[i]));
-		strcpy(temp,fileList[i]);
-		char* indexes = strtok(temp,"-");
-		indexes = strtok(NULL,"");
-		sscanf(indexes,"%d_%d",&stripeId,&blockId);
-		printf("blockID :%d\n",blockId);
+	// 	// Filename Parsing/preprocessing
+	// 	char* temp = malloc(sizeof(fileList[i]));
+	// 	strcpy(temp,fileList[i]);
+	// 	char* indexes = strtok(temp,"-");
+	// 	indexes = strtok(NULL,"");
+	// 	sscanf(indexes,"%d_%d",&stripeId,&blockId);
+	// 	printf("blockID :%d\n",blockId);
 
-		if(blockId >= k) {
-			continue;
-		}else{
-			mergeList[mergeListIndex] = fileList[i];
-			mergeListIndex++;
-		}
-	}
-	// Merge File
-	merge_file(filename, mergeList, blockSize, fullFileSize, 1);
-	// Remove Cache
-	for(int i = 0; i<n*numberOfStripe;i++){
-		
-		remove(fileList[i]);
-	}
-	char *metadataName = malloc(sizeof(char) * 1024);
-	strcpy(metadataName, "_META_");
-	strcat(metadataName, filename);
-	remove(metadataName);
+	// 	if(blockId >= k) {
+	// 		continue;
+	// 	}else{
+	// 		mergeList[mergeListIndex] = fileList[i];
+	// 		mergeListIndex++;
+	// 	}
+	// }
+
 	
 }
 
