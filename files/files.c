@@ -70,6 +70,21 @@ void chunkFile(char *fileName, int n, int k, int blockSize, Stripe **stripes)
 void merge_file(char *filename, unsigned char **file_list, int blockSize, int fileSize,int n,int k,int deleteBlock)
 {
 	//printf("Inside merge file function\n");
+	int numberOfStripe = ceil((double)fileSize / (blockSize * k));
+	Stripe** stripes = malloc(numberOfStripe*n*blockSize);
+	for(int j = 0; j < numberOfStripe; j++){
+		//stripes[0] = malloc(n * blockSize);
+		//stripes[j]->encodeMatrix = malloc(sizeof(uint8_t) * (n * k));
+		//stripes[j]->table = malloc(sizeof(uint8_t) * (32 * k * (n - k)));
+		//stripes[j]->blocks = (unsigned char**)malloc(n * sizeof(unsigned char*) );
+
+		stripes[j] = (Stripe*)malloc(n*blockSize);
+		stripes[j]->blocks = (unsigned char**)malloc(5*blockSize);
+		for(int i = 0; i < n; i++){
+			stripes[j]->blocks[i] = (unsigned char*)malloc(blockSize);
+			//printf("%d %d\n", j, i);
+		}
+	}
 
 	//Write the merged file to "result_filename"
 	char mergedFilename[1024];
@@ -102,8 +117,12 @@ void merge_file(char *filename, unsigned char **file_list, int blockSize, int fi
 		while (((c = fgetc(fp1)) != EOF) && ((fileSize - mergedBytes) > 0))
 		{
 			fputc(c, original_file);
+			
 			mergedBytes++;
 		}
+		// Now debugging this
+		fread(stripes[stripePtr]->blocks[serverIDPtr],1,blockSize,fp1);
+		
 		fclose(fp1);
 		serverIDPtr++;
 		if(serverIDPtr==k){
