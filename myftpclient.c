@@ -240,6 +240,10 @@ void client_get(int n, int k, int blockSize, int *sd, char *filename)
 				printf("Get block [%s]\n",blockName);
 			}
 
+			//fullFileSize = getFileSizeFromMetadata(blockName);
+			//numberOfStripe = ceil((double)fullFileSize / (blockSize * k));
+			//printf("File Size: %s\n",fullFileSize);
+
 			//Get file from server
 			if (FD_ISSET(sd[serverID], &fds))
 			{
@@ -266,6 +270,7 @@ void client_get(int n, int k, int blockSize, int *sd, char *filename)
 					printf("0 Packet Received\n");
 					return;
 				}
+				
 
 				//Check MYFTP
 				if (check_myftp(get_reply.header.protocol) < 0)
@@ -356,7 +361,6 @@ void client_get(int n, int k, int blockSize, int *sd, char *filename)
 	int stripeId = 0;
 	int blockId = 0;
 	int mergeListIndex = 0;
-	char* placeholder = malloc;
 	for(int i = 0; i < n * numberOfStripe; i++){
 		
 		// Filename Parsing/preprocessing
