@@ -12,6 +12,7 @@
 #include <fcntl.h>
 #include <dirent.h> 
 #include <math.h>
+#include <stdbool.h>
 
 // Stripe Structure
 typedef struct stripe{
@@ -19,6 +20,7 @@ typedef struct stripe{
     uint8_t* encodeMatrix;
     uint8_t* errorsMatrix;
     uint8_t* invertMatrix;
+    uint8_t* decodeMatrix;
     uint8_t* table;
 } Stripe;
 
@@ -40,7 +42,7 @@ void stripeToFile(char* fileName, int k, int blockSize, Stripe *stripe, int stri
 void blockToFile(char* fileName, int k, int blockSize, unsigned char* block, int stripeIndex, int blockIndex);
 
 // Merge file wth file_list
-void merge_file(char *filename, unsigned char **file_list, int blockSize, int fileSize,int n, int k, int deleteBlock);
+void merge_file(char *filename, unsigned char **file_list, int blockSize, int fileSize,int n,int k,int deleteBlock, int workNode[]);
 
 // Split all blocks
 void stripesToFile(char* fileName, int n, int k, int blockSize, Stripe **stripes);
@@ -64,3 +66,5 @@ void generateMetadata(char* metadataName, char* filename, int fileSize);
 int getFileSizeFromMetadata(char* metadataName);
 
 int fileSizeOf(char *filename);
+
+uint8_t *decodeData(int n, int k, unsigned char** errorData, unsigned char** normalData, int errorNodes[], int workNodes[], Stripe *stripe, size_t blockSize, int errorIndex);

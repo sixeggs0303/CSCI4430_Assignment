@@ -364,7 +364,8 @@ void client_get(int n, int k, int blockSize, int *sd, char *filename)
 	//Don't merge until u got all the blocks on disk
 	unsigned char **blockList = (unsigned char **)malloc(sizeof(unsigned char *) * n * numberOfStripe);
 	int blocksToSend = find_file(filename, blockList);
-	merge_file(filename, blockList, blockSize, fullFileSize ,n ,k ,1);
+	
+	merge_file(filename, blockList, blockSize, fullFileSize ,n ,k ,1,workNode);
 
 	//Finish decode and merge the file here
 	//Remember to remove cache file afterward (including Metadata)
