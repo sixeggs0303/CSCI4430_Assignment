@@ -25,6 +25,7 @@ typedef struct stripe{
 // Encoding
 uint8_t* encodeData(int n, int k, Stripe *stripe, size_t blockSize);
 
+uint8_t *decodeData(int n, int k, Stripe *stripe, size_t blockSize, int workNodes[]);
 // 1. File chunk & merge
 
 //! This calculate number of stripe
@@ -64,3 +65,5 @@ void generateMetadata(char* metadataName, char* filename, int fileSize);
 int getFileSizeFromMetadata(char* metadataName);
 
 int fileSizeOf(char *filename);
+
+void restoreBlocks(char *fileName, int n, int k, int blockSize, Stripe **stripes, int* workNode);

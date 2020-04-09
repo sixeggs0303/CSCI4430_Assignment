@@ -71,6 +71,7 @@ void server_list(int clientsd, struct packet recv_packet)
 	}
 	rewinddir(dirp);
 	char *payload = malloc(1024 * numberOfItem);
+	//memset(payload,0,1024 * numberOfItem);
 	while ((entry = readdir(dirp)))
 	{
 		strcpy(buffer, entry->d_name);
@@ -82,6 +83,7 @@ void server_list(int clientsd, struct packet recv_packet)
 			continue; 
 		}
 		char *tem = malloc(sizeof(char) * 1024);
+		memset(tem,0,sizeof(char) * 1024);
 		strncat(tem, buffer, block_index);
 		if (block_index != 0)
 		{
@@ -92,6 +94,7 @@ void server_list(int clientsd, struct packet recv_packet)
 			}
 			else
 			{
+				free(tem);
 				continue;
 			}
 		}
@@ -100,11 +103,14 @@ void server_list(int clientsd, struct packet recv_packet)
 			strcat(payload, buffer);
 			strcat(payload, "\n");
 		}
+		free(tem);
 	}
 	printf("%s", payload);
 	closedir(dirp);
 	list_reply.length = 10 + strlen(payload);
 	message_to_client(clientsd, list_reply, payload, strlen(payload));
+
+	free(payload);
 }
 
 void server_get(int clientsd, struct packet recv_packet)

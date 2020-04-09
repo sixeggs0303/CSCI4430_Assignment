@@ -28,6 +28,7 @@ void getData(char *filename, int *n, int *k, int *blockSize, char ipAddress[5][1
 		strcpy(serverData[i], buffer);
 		i++;
 	}
+	free(buffer);
 	fclose(fptr);
 
 	int index = (strchr(serverData[3], ':')) - serverData[3];
@@ -62,59 +63,6 @@ void message_to_server(int sd, struct message_s m_header, char *payload, int pay
 	}
 	free(send_message);
 }
-
-// Usage: The file will be splited with file_name input,n and k
-// You can also add Stripe **stripes parameter to preserve the Object Lists
-/*
-void chunk_file(char *file_name, int n, int k, int blockSize)
-{
-	//printf("Inside chunk file function:\n");
-	// Read the file
-	int fd = open(file_name, O_RDONLY);
-
-	if (!fd)
-	{
-		printf("file open error: %s (Errno:%d)\n", (char *)strerror(errno), errno);
-		return;
-	}
-	int numberOfStripe = number_of_stripe(file_name, k, blockSize);
-	// Move this line below to main to preserve the Objects
-	Stripe **stripes = (Stripe **)malloc(sizeof(Stripe) * numberOfStripe);
-
-	// Split file into stripe
-	for (int h = 0; h < numberOfStripe; h++)
-	{
-		// Declare Stripe Object
-		stripes[h] = (Stripe *)malloc(sizeof(Stripe));
-
-		// declare Datablock Array inside a Stripe
-		stripes[h]->data_blocks = (unsigned char **)malloc(k * sizeof(blockSize));
-
-		// declare parity block array inside a Stripe
-		stripes[h]->parity_blocks = (unsigned char **)malloc((n - k) * sizeof(blockSize));
-
-		// Split file into datablock
-		// declare Datablock with for loop and chunk file
-		int maxH = ceil(log(numberOfStripe) / log(10));
-		//printf("max h is %d\n", maxH);
-
-		for (int i = 0; i < k; i++)
-		{
-			stripes[h]->data_blocks[i] = (unsigned char *)malloc(blockSize);
-			pread(fd, stripes[h]->data_blocks[i], blockSize, (i + h * k) * blockSize);
-			// Declare file chunk name string
-			char *file_chunk_name = (char *)malloc(sizeof(char) * 255);
-			sprintf(file_chunk_name, "%s-%0*d-%d", file_name, maxH, h, i);
-			//printf("%s\n",file_chunk_name);
-
-			FILE *wfptr = fopen(file_chunk_name, "wb");
-			fwrite(stripes[h]->data_blocks[i], 1, blockSize, wfptr);
-			//printf("Block created: %s\n", file_chunk_name);
-			fclose(wfptr);
-		}
-	}
-}
-*/
 
 void client_list(int sd)
 {
@@ -228,25 +176,22 @@ void client_get(int n, int k, int blockSize, int *sd, char *filename)
 
 		//IO Multiplexing
 		select(maxfd + 1, NULL, &fds, NULL, NULL);
-		for (int serverID = 0; serverID < n; serverID++)
+		for (int serverIndex = 0; serverIndex < workNodeIndex; serverIndex++)
 		{
+			int serverID = workNode[serverIndex];
 			//Check if all blocks for this server is received
-			if ((numberOfStripe !=-1) && (nextBlockToRecvPtr[serverID] >= numberOfStripe) )
+			if ((numberOfStripe != -1) && (nextBlockToRecvPtr[serverID] >= numberOfStripe))
 			{
 				nextBlockToRecvPtr[serverID] = -1;
 				continue;
 			}
 
-			if(blocksToReceive > 0){
+			if (blocksToReceive > 0)
+			{
 				sprintf(blockName, "%s-%0*d_%d", filename, maxH, nextBlockToRecvPtr[serverID], serverID);
-				printf("File name: %s, maxH: %d, stripe num: %d, serverID: %d",filename,maxH, nextBlockToRecvPtr[serverID], serverID);
-				printf("Get block [%s]\n",blockName);
+				printf("Get block [%s]\n", blockName);
 			}
-
-			//fullFileSize = getFileSizeFromMetadata(blockName);
-			//numberOfStripe = ceil((double)fullFileSize / (blockSize * k));
-			//printf("File Size: %s\n",fullFileSize);
-
+			printf("Server is %d\n",sd[serverID]);
 			//Get file from server
 			if (FD_ISSET(sd[serverID], &fds))
 			{
@@ -255,7 +200,6 @@ void client_get(int n, int k, int blockSize, int *sd, char *filename)
 				memcpy(get_request.protocol, (unsigned char[]){'m', 'y', 'f', 't', 'p'}, 5);
 				get_request.type = 0xB1;
 				get_request.length = sizeof(struct message_s) + strlen(blockName) + 1;
-
 				message_to_server(sd[serverID], get_request, blockName, strlen(blockName) + 1);
 
 				//Receive GET Reply
@@ -273,7 +217,6 @@ void client_get(int n, int k, int blockSize, int *sd, char *filename)
 					printf("0 Packet Received\n");
 					return;
 				}
-				
 
 				//Check MYFTP
 				if (check_myftp(get_reply.header.protocol) < 0)
@@ -322,7 +265,7 @@ void client_get(int n, int k, int blockSize, int *sd, char *filename)
 						}
 					}
 					fclose(fptr);
-					printf("[%s] Download Completed from Server %d.\n", blockName, serverID);
+					printf("Download Completed from Server %d.\n", serverID);
 					blocksToReceive--;
 					nextBlockToRecvPtr[serverID]++;
 				}
@@ -345,90 +288,37 @@ void client_get(int n, int k, int blockSize, int *sd, char *filename)
 				numberOfStripe = ceil((double)fullFileSize / (blockSize * k));
 				printf("Metadata received:\nFile size: %d\nNumber of stripe: %d\n", fullFileSize, numberOfStripe);
 				nextBlockToRecvPtr[serverID] = 0;
-				blocksToReceive = numberOfStripe*connectedServers;
+				blocksToReceive = numberOfStripe * connectedServers;
 				serverID = -1;
 				maxH = ceil(log(numberOfStripe) / log(10));
+				remove(blockName);
 			}
 		}
 	}
-	
-	printf("***Blocks downloaded***\n");
 
 	//Decode Here
 	//Prepared workNode for decodeData
-	for(int i =0;i<k;i++){
-		printf("First k Work Nodes: %d\n",workNode[i]);
+	for (int i = 0; i < k; i++)
+	{
+		printf("First k Work Nodes: %d\n", workNode[i]);
 	}
+	Stripe **stripes;
+	restoreBlocks(filename, n, k, blockSize, stripes, workNode);
 
 	//Merge Here
 	//Don't merge until u got all the blocks on disk
 	unsigned char **blockList = (unsigned char **)malloc(sizeof(unsigned char *) * n * numberOfStripe);
 	int blocksToSend = find_file(filename, blockList);
-	merge_file(filename, blockList, blockSize, fullFileSize ,n ,k ,1);
+	merge_file(filename, blockList, blockSize, fullFileSize, n, k, 1);
 
-	//Finish decode and merge the file here
-	//Remember to remove cache file afterward (including Metadata)
-	// unsigned char** fileList = malloc(255*n*numberOfStripe);
-	// unsigned char** mergeList = malloc(255*k*numberOfStripe);
-	
-<<<<<<< HEAD
-	// find_file(filename,fileList);
-	// printf("Full File size: %d\n",fullFileSize);
+	free(nextBlockToRecvPtr);
+	free(blockName);
 
-	// // Filter Parity
-	// int stripeId = 0;
-	// int blockId = 0;
-	// int mergeListIndex = 0;
-	// char* placeholder = malloc;
-	// for(int i = 0; i < n * numberOfStripe; i++){
-=======
-	find_file(filename,fileList);
-	printf("Full File size: %d\n",fullFileSize);
-
-	// Filter Parity
-	int stripeId = 0;
-	int blockId = 0;
-	int mergeListIndex = 0;
-	for(int i = 0; i < n * numberOfStripe; i++){
-		
-		// Filename Parsing/preprocessing
-		char* temp = malloc(sizeof(fileList[i]));
-		strcpy(temp,fileList[i]);
-		char* indexes = strtok(temp,"-");
-		indexes = strtok(NULL,"");
-		sscanf(indexes,"%d_%d",&stripeId,&blockId);
-		printf("blockID :%d\n",blockId);
-
-		if(blockId >= k) {
-			continue;
-		}else{
-			mergeList[mergeListIndex] = fileList[i];
-			mergeListIndex++;
-		}
+	for (int i = 0; i < blocksToSend; i++)
+	{
+		free(blockList[i]);
 	}
-	// Merge File
-	merge_file(filename, mergeList, blockSize, fullFileSize, 1);
-	// Remove Cache
-	for(int i = 0; i<n*numberOfStripe;i++){
->>>>>>> c0be752a447ea536b62b8a032a337b319b2521ee
-		
-	// 	// Filename Parsing/preprocessing
-	// 	char* temp = malloc(sizeof(fileList[i]));
-	// 	strcpy(temp,fileList[i]);
-	// 	char* indexes = strtok(temp,"-");
-	// 	indexes = strtok(NULL,"");
-	// 	sscanf(indexes,"%d_%d",&stripeId,&blockId);
-	// 	printf("blockID :%d\n",blockId);
-
-	// 	if(blockId >= k) {
-	// 		continue;
-	// 	}else{
-	// 		mergeList[mergeListIndex] = fileList[i];
-	// 		mergeListIndex++;
-	// 	}
-	// }
-
-	
+	free(blockList);
 }
 
 void client_put(int n, int k, int blockSize, int *sd, char *filename)
@@ -588,12 +478,19 @@ void client_put(int n, int k, int blockSize, int *sd, char *filename)
 		}
 	}
 
+	printf("PUT succeed.\n");
+
 	//Clean cache
 	for (int i = 0; i < numberOfStripe * n; i++)
 	{
 		remove(blockList[i]);
+		free(blockList[i]);
 	}
 	remove(metadataName);
+	free(blockList);
+	free(completedServer);
+	free(nextBlockToSendPtr);
+	free(metadataName);
 }
 
 int main(int argc, char **argv)
@@ -707,6 +604,6 @@ int main(int argc, char **argv)
 	{
 		close(sd[i]);
 	}
-
+	free(sd);
 	return 0;
 }
